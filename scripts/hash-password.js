@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Usage: node scripts/hash-password.js "the-password"
 //
-// Generates a bcrypt hash to paste into the AUTH_USERS environment variable.
-// Run this locally — never send plaintext passwords over email or Slack.
+// Generates a standalone bcrypt hash — useful for manually resetting a
+// single user's password_hash directly in Supabase without recreating the
+// whole user via invite-user.js. Run locally — never send plaintext
+// passwords over email or Slack.
 
 const bcrypt = require('bcryptjs')
 
@@ -15,8 +17,6 @@ if (!password) {
 
 const hash = bcrypt.hashSync(password, 12)
 
-console.log('\nPaste this hash into the AUTH_USERS entry for this user:\n')
+console.log('\nBcrypt hash (paste into the users.password_hash column):\n')
 console.log(hash)
-console.log('\nExample AUTH_USERS entry:\n')
-console.log(JSON.stringify({ email: 'user@client.com', passwordHash: hash, name: 'Full Name', role: 'trainee' }, null, 2))
 console.log('')

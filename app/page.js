@@ -11,7 +11,15 @@ export default function Home() {
   const [started, setStarted] = useState(false)
   const [industry, setIndustry] = useState(null)
   const [trainingType, setTrainingType] = useState(null)
-  const modules = MODULES.filter(m => !m.adminOnly || session?.user?.role === 'admin')
+  const TEAM_VIEW_ROLES = ['manager', 'org_admin', 'corporate_admin']
+  const ADMIN_CONSOLE_ROLES = ['org_admin', 'corporate_admin']
+  const REVIEWER_ROLES = ['content_approver', 'org_admin', 'corporate_admin']
+  const modules = MODULES.filter(m => {
+    if (m.orgAdminOnly) return ADMIN_CONSOLE_ROLES.includes(session?.user?.role)
+    if (m.reviewerOnly) return REVIEWER_ROLES.includes(session?.user?.role)
+    if (m.adminOnly) return TEAM_VIEW_ROLES.includes(session?.user?.role)
+    return true
+  })
 
   // Check sessionStorage so navigating back doesn't re-show splash
   useEffect(() => {

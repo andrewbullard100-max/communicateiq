@@ -108,7 +108,7 @@ export default function TeamDashboard() {
         <div className="card" style={{ maxWidth: 420, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: '#1C2B5E' }}>Admin Access Required</div>
-          <div style={{ color: '#6B7280', fontSize: 13, marginBottom: 18 }}>The Team Dashboard is restricted to admin accounts.</div>
+          <div style={{ color: '#6B7280', fontSize: 13, marginBottom: 18 }}>The Team Dashboard is restricted to manager accounts and above.</div>
           <Link href="/" className="btn-primary">Back to Platform</Link>
         </div>
       </div>

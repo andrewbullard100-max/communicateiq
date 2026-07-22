@@ -51,7 +51,7 @@ function parseScoringResult(text) {
   } catch { return null }
 }
 
-function persistResult(scenario, scored) {
+function persistResult(scenario, scored, transcript) {
   if (!scenario || !scored?.scores) return
   fetch('/api/results', {
     method: 'POST',
@@ -64,6 +64,7 @@ function persistResult(scenario, scored) {
       scores: scored.scores,
       certificationStatus: scored.certificationStatus,
       headline: scored.headline,
+      transcript, // full message history — persisted only if the org's transcript_retention policy allows it (see lib/transcripts.js)
     }),
   }).catch(() => {}) // fire-and-forget — never blocks the trainee's results screen
 }
@@ -320,7 +321,7 @@ useEffect(() => {
       const scored = parseScoringResult(aiText)
       if (scored) {
         setResult(scored)
-        persistResult(selectedRef.current, scored)
+        persistResult(selectedRef.current, scored, messagesRef.current)
         setScreen('results')
       } else {
         const updatedMsgs = [...newMsgs, { role: 'assistant', content: aiText }]
@@ -331,8 +332,8 @@ useEffect(() => {
         await speakText(aiText, true) // speak then auto-mic
         return
       }
-    } catch {
-      const errMsgs = [...messagesRef.current, { role: 'assistant', content: 'Connection error — please try again.' }]
+    } catch (err) {
+      const errMsgs = [...messagesRef.current, { role: 'assistant', content: err?.message || 'Connection error — please try again.' }]
       setMessages(errMsgs)
       messagesRef.current = errMsgs
     }
@@ -359,8 +360,8 @@ useEffect(() => {
       isLoading.current = false
       setLoading(false)
       setPendingOpeningLine(text) // hold here — wait for user gesture
-    } catch {
-      setMessages([{ role: 'assistant', content: 'Connection error.' }])
+    } catch (err) {
+      setMessages([{ role: 'assistant', content: err?.message || 'Connection error.' }])
       isLoading.current = false
       setLoading(false)
     }
@@ -395,7 +396,7 @@ useEffect(() => {
     const scored = parseScoringResult(text)
     if (scored) { 
       setResult(scored)
-      persistResult(selectedRef.current, scored)
+      persistResult(selectedRef.current, scored, messagesRef.current)
       setScreen('results') 
     } else {
       // Force it with a second attempt
@@ -405,7 +406,7 @@ useEffect(() => {
         max_tokens: 800
       })
       const scoredRetry = parseScoringResult(retry)
-      if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry); setScreen('results') }
+      if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry, messagesRef.current); setScreen('results') }
     }
   } catch {}
   isLoading.current = false

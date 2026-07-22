@@ -1,34 +1,34 @@
 import OpenAI from 'openai'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../../../lib/auth'
+import { checkAndRecordUsage, RateLimitError } from '../../../lib/rateLimit'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-// Common female first names — expand as needed
-const FEMALE_NAMES = new Set([
-  'mary','patricia','jennifer','linda','barbara','elizabeth','susan','jessica','sarah','karen',
-  'lisa','nancy','betty','margaret','sandra','ashley','emily','dorothy','kimberly','donna',
-  'carol','michelle','amanda','melissa','deborah','stephanie','rebecca','sharon','laura','cynthia',
-  'kathleen','amy','angela','shirley','anna','brenda','pamela','emma','nicole','helen',
-  'samantha','katherine','christine','debra','rachel','carolyn','janet','catherine','heather','diane',
-  'julie','joyce','victoria','kelly','christina','joan','evelyn','lauren','judith','olivia',
-  'frances','martha','cheryl','megan','andrea','hannah','jacqueline','ann','gloria','jean',
-  'kathryn','alice','teresa','sara','janice','doris','madison','julia','grace','judy',
-  'abigail','marie','denise','beverly','amber','theresa','danielle','marilyn','brittany','diana',
-  'sophia','brittney','alexis','tiffany','kayla','vanessa','natalie','crystal','brianna','alyssa',
-  'stacy','tracy','dawn','april','tara','rebekah','cindy','whitney','miranda','faith',
-  'alicia','courtney','molly','brooke','shelby','jenna','jillian','paige','leah','autumn',
-  'shannon','chelsea','destiny','skylar','miranda','hailey','kaitlyn','madison','brooklyn','aubrey',
-])
-
-function detectVoice(name) {
-  if (!name) return 'nova'
-  const first = name.trim().split(' ')[0].toLowerCase()
-  return FEMALE_NAMES.has(first) ? 'nova' : 'onyx'
-}
+// Valid OpenAI TTS voices. None of these are gendered by name — 'alloy' and
+// 'shimmer' read fairly neutral, the rest lean masculine/feminine by ear but
+// none are documented as strictly one or the other. Callers (simulation/QBR
+// pages) should pass an explicit `voice` when a persona's voice matters for
+// the scenario; we do not infer it from anyone's name — see MIGRATING.md
+// for what this replaced (a name-matching heuristic that, as it turned out,
+// no caller ever actually triggered, since none of them sent a name).
+const VALID_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'])
+const DEFAULT_VOICE = 'alloy'
 
 export async function POST(req) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await checkAndRecordUsage({ userId: session.user.id, orgId: session.user.orgId, route: 'speak' })
+  } catch (err) {
+    if (err instanceof RateLimitError) return Response.json({ error: err.message, reason: err.reason }, { status: err.status })
+    throw err
+  }
+
   try {
     const body = await req.json()
-    const { text, speakerName } = body
+    const { text, voice: requestedVoice } = body
 
     if (!text?.trim()) return Response.json({ error: 'No text' }, { status: 400 })
 
@@ -40,7 +40,7 @@ export async function POST(req) {
 
     if (!clean) return Response.json({ error: 'No text after cleaning' }, { status: 400 })
 
-    const voice = detectVoice(speakerName)
+    const voice = VALID_VOICES.has(requestedVoice) ? requestedVoice : DEFAULT_VOICE
 
     const mp3 = await openai.audio.speech.create({
       model: 'tts-1',

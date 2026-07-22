@@ -64,7 +64,7 @@ Keep under 400 words. Be direct and specific.`
     try {
       const result = await callAI({ system, messages: [{ role: 'user', content: `SCENARIO: ${WRITTEN_SCENARIO}\n\nPARTICIPANT RESPONSE:\n${writtenResponse}` }], max_tokens: 700 })
       setWrittenFeedback(result)
-    } catch { setWrittenFeedback('Connection error. Please try again.') }
+    } catch (err) { setWrittenFeedback(err?.message || 'Connection error. Please try again.') }
     setLoading(false)
   }
 

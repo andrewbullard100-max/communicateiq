@@ -1,7 +1,13 @@
 'use client'
-import { useState, Suspense } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect, Suspense } from 'react'
+import { signIn, getProviders } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
+
+const PROVIDER_LABELS = {
+  'azure-ad': 'Continue with Microsoft',
+  okta: 'Continue with Okta',
+  google: 'Continue with Google',
+}
 
 function LoginForm() {
   const router = useRouter()
@@ -11,6 +17,23 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [ssoProviders, setSsoProviders] = useState([])
+
+  useEffect(() => {
+    getProviders().then(providers => {
+      if (!providers) return
+      setSsoProviders(Object.values(providers).filter(p => p.id !== 'credentials'))
+    })
+    const ssoError = params.get('error')
+    if (ssoError && ssoError !== 'CredentialsSignin') {
+      // NextAuth funnels OAuthCallback / AccessDenied errors here; the
+      // profile() function's thrown message isn't preserved verbatim by
+      // NextAuth's redirect, so this is intentionally generic — the real
+      // reason is in login_events (Admin Console → Sign-In Activity) for
+      // whoever needs to debug a specific rejected sign-in.
+      setError('Single sign-on failed. Contact your organization admin if this continues.')
+    }
+  }, [params])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -53,6 +76,30 @@ function LoginForm() {
         <div style={{ fontSize: 13, fontWeight: 700, color: '#1C2B5E', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
           Sign In
         </div>
+
+        {ssoProviders.length > 0 && (
+          <>
+            {ssoProviders.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => signIn(p.id, { callbackUrl })}
+                style={{
+                  background: '#fff', color: '#1C2B5E', border: '1.5px solid #D1D5DB',
+                  borderRadius: 8, padding: '10px 16px', fontSize: 13.5, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {PROVIDER_LABELS[p.id] || `Continue with ${p.name}`}
+              </button>
+            ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+              <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
+              <span style={{ fontSize: 11, color: '#9CA3AF' }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
+            </div>
+          </>
+        )}
 
         <div>
           <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Email</label>

@@ -5,6 +5,32 @@ import { C, callAI, getSelectedIndustryId, getIndustryConfig } from '../../lib/d
 
 const SILENCE_MS = 5000
 
+// Persists a completed QBR delivery to the same simulation_attempts table
+// the role-play module uses — this didn't exist before Phase 6, so QBR
+// results never showed up on the Team/Certification dashboards. scores
+// keys are QBR-specific (executivePresence, dataCommand, etc.), which
+// simulation_attempts.ai_scores stores fine since it's jsonb — the review
+// UI renders whatever dimension keys are present rather than assuming
+// the role-play module's five.
+function persistQbrResult(industryId, deliveryResult, transcript) {
+  if (!deliveryResult) return
+  const { headline, boardReadiness, strongestMoment, criticalGap, ...scores } = deliveryResult
+  fetch('/api/results', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scenarioId: 'qbr-delivery',
+      scenarioTitle: 'QBR Delivery',
+      industry: industryId,
+      trainingType: 'qbr',
+      scores,
+      certificationStatus: boardReadiness,
+      headline,
+      transcript,
+    }),
+  }).catch(() => {}) // fire-and-forget — never blocks the trainee's results screen
+}
+
 export default function QBRPage() {
   const [industryId, setIndustryId] = useState('higher-ed')
   useEffect(() => { setIndustryId(getSelectedIndustryId()) }, [])
@@ -167,14 +193,16 @@ export default function QBRPage() {
       if (text.includes(marker)) {
         try {
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
-          setDeliveryResult(JSON.parse(clean))
+          const parsed = JSON.parse(clean)
+          setDeliveryResult(parsed)
+          persistQbrResult(industryId, parsed, newMsgs)
           setStep('results')
         } catch { setMessages(prev => [...prev, { role: 'assistant', content: text }]) }
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: text }])
         await speakText(text, true)
       }
-    } catch { setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error.' }]) }
+    } catch (err) { setMessages(prev => [...prev, { role: 'assistant', content: err?.message || 'Connection error.' }]) }
     setLoading(false)
   }
 
@@ -204,7 +232,7 @@ Keep total under 400 words. Be specific.`
         max_tokens: 700,
       })
       setStructureReview(result)
-    } catch { setStructureReview('Connection error. Please try again.') }
+    } catch (err) { setStructureReview(err?.message || 'Connection error. Please try again.') }
     setLoading(false)
   }
 
@@ -278,7 +306,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
       })
       setMessages([{ role: 'assistant', content: text }])
       await speakText(text, true)
-    } catch { setMessages([{ role: 'assistant', content: 'Connection error. Please try again.' }]) }
+    } catch (err) { setMessages([{ role: 'assistant', content: err?.message || 'Connection error. Please try again.' }]) }
     setLoading(false)
   }
 
@@ -296,14 +324,16 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
       if (text.includes(marker)) {
         try {
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
-          setDeliveryResult(JSON.parse(clean))
+          const parsed = JSON.parse(clean)
+          setDeliveryResult(parsed)
+          persistQbrResult(industryId, parsed, newMsgs)
           setStep('results')
         } catch { setMessages(prev => [...prev, { role: 'assistant', content: text }]) }
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: text }])
         await speakText(text, true)
       }
-    } catch { setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error.' }]) }
+    } catch (err) { setMessages(prev => [...prev, { role: 'assistant', content: err?.message || 'Connection error.' }]) }
     setLoading(false)
   }
 
@@ -321,7 +351,9 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
       if (text.includes(marker)) {
         try {
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
-          setDeliveryResult(JSON.parse(clean))
+          const parsed = JSON.parse(clean)
+          setDeliveryResult(parsed)
+          persistQbrResult(industryId, parsed, apiMsgs)
           setStep('results')
         } catch {}
       } else {
@@ -333,7 +365,9 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
         if (retry.includes(marker)) {
           try {
             const clean = retry.slice(retry.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
-            setDeliveryResult(JSON.parse(clean))
+            const parsed = JSON.parse(clean)
+            setDeliveryResult(parsed)
+            persistQbrResult(industryId, parsed, apiMsgs)
             setStep('results')
           } catch {}
         }

@@ -63,7 +63,7 @@ Total response under 400 words. Be specific to what they wrote, not generic.`
         max_tokens: 600,
       })
       setTranslationFeedback(result)
-    } catch { setTranslationFeedback('Connection error. Please try again.') }
+    } catch (err) { setTranslationFeedback(err?.message || 'Connection error. Please try again.') }
     setLoading(false)
   }
 
@@ -100,7 +100,7 @@ Keep total under 300 words.`
         max_tokens: 500,
       })
       setChallengeFeedback(result)
-    } catch { setChallengeFeedback('Connection error. Please try again.') }
+    } catch (err) { setChallengeFeedback(err?.message || 'Connection error. Please try again.') }
     setLoading(false)
   }
 
