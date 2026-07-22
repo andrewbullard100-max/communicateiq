@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CommunicateIQ — Reference Sheets</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #f0f0f0; }
+
+  .screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; gap: 16px; }
+  .screen h1 { font-size: 28px; color: #1C2B5E; }
+  .screen p { color: #6B7280; font-size: 14px; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 600px; width: 100%; }
+  .btn { background: #1C2B5E; color: white; border: none; border-radius: 8px; padding: 14px 20px; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; transition: background 0.2s; }
+  .btn:hover { background: #2a3f7e; }
+  .btn.master { background: #0D9488; grid-column: 1 / -1; }
+  .btn.master:hover { background: #0B7A70; }
+  .btn .sub { font-size: 11px; font-weight: 400; opacity: 0.8; display: block; margin-top: 3px; }
+
+  /* Print page */
+  .page { width: 210mm; min-height: 297mm; background: white; margin: 0 auto; padding: 16mm; display: none; }
+  .page.active { display: block; }
+
+  /* Header */
+  .page-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0D9488; padding-bottom: 10px; margin-bottom: 14px; }
+  .wordmark { font-size: 24px; font-weight: 900; color: #1C2B5E; }
+  .wordmark span { color: #0D9488; }
+  .page-title { text-align: right; }
+  .page-title .series { font-size: 9px; color: #6B7280; letter-spacing: 1px; text-transform: uppercase; }
+  .page-title .name { font-size: 14px; font-weight: 700; color: #1C2B5E; }
+
+  /* Sections */
+  .section { margin-bottom: 14px; }
+  .section-label { font-size: 8px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #0D9488; margin-bottom: 5px; }
+  .section-title { font-size: 14px; font-weight: 700; color: #1C2B5E; margin-bottom: 5px; }
+  .section-body { font-size: 11px; color: #374151; line-height: 1.6; }
+
+  /* Context box */
+  .context-box { background: #F4F6F9; border-left: 3px solid #1C2B5E; padding: 10px 12px; border-radius: 0 6px 6px 0; font-size: 11px; color: #374151; line-height: 1.6; margin-bottom: 12px; }
+
+  /* Opening line */
+  .opening-box { background: #1C2B5E; color: white; padding: 10px 14px; border-radius: 6px; font-size: 12px; font-style: italic; line-height: 1.6; margin-bottom: 12px; }
+  .opening-box .label { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.6); display: block; margin-bottom: 5px; font-style: normal; }
+
+  /* Data table */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; }
+  th { background: #1C2B5E; color: white; padding: 5px 8px; text-align: left; font-size: 9px; letter-spacing: 0.5px; }
+  td { padding: 5px 8px; border-bottom: 1px solid #E5E7EB; color: #374151; }
+  tr:nth-child(even) td { background: #F9FAFB; }
+  tr:last-child td { font-weight: 700; background: #F0F0F0; }
+
+  /* Success criteria */
+  .criteria { list-style: none; }
+  .criteria li { display: flex; gap: 8px; margin-bottom: 5px; font-size: 11px; color: #374151; }
+  .criteria li::before { content: "+"; color: #1C2B5E; font-weight: 700; flex-shrink: 0; }
+
+  /* Two col */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .box { background: #F4F6F9; border-radius: 6px; padding: 10px 12px; border: 1px solid #D1D5DB; }
+  .box .box-label { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #1C2B5E; margin-bottom: 5px; }
+  .box .box-body { font-size: 10px; color: #374151; line-height: 1.6; }
+
+  /* Terminology table */
+  .term-row { display: grid; grid-template-columns: 130px 1fr 1fr; gap: 8px; margin-bottom: 8px; align-items: start; }
+  .term-name { font-size: 10px; font-weight: 700; color: #1C2B5E; }
+  .say { background: rgba(27,107,47,0.08); border: 1px solid #2A8A40; border-radius: 4px; padding: 6px 8px; font-size: 9px; color: #374151; }
+  .not { background: rgba(192,0,0,0.06); border: 1px solid #C00000; border-radius: 4px; padding: 6px 8px; font-size: 9px; color: #374151; }
+  .say::before { content: "✓ SAY: "; color: #2A8A40; font-weight: 700; }
+  .not::before { content: "✗ NOT: "; color: #C00000; font-weight: 700; }
+
+  /* Persona card */
+  .persona-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  .persona-card { background: #F4F6F9; border-radius: 6px; padding: 10px; border: 1px solid #D1D5DB; }
+  .persona-icon { font-size: 20px; margin-bottom: 4px; }
+  .persona-name { font-size: 10px; font-weight: 700; color: #1C2B5E; margin-bottom: 4px; }
+  .persona-desc { font-size: 9px; color: #6B7280; line-height: 1.5; }
+
+  /* Footer */
+  .page-footer { border-top: 1px solid #D1D5DB; padding-top: 8px; margin-top: 14px; display: flex; justify-content: space-between; font-size: 8px; color: #9CA3AF; }
+
+  @media print {
+    body { background: white; }
+    .screen { display: none; }
+    .page { display: block !important; width: 100%; min-height: auto; padding: 12mm; margin: 0; page-break-after: always; }
+    .page:last-child { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SELECTION SCREEN -->
+<div class="screen" id="screen">
+  <div style="text-align:center">
+    <div style="font-size:32px;font-weight:900;color:#1C2B5E">Communicate<span style="color:#0D9488">IQ</span></div>
+    <div style="font-size:11px;color:#6B7280;letter-spacing:2px;text-transform:uppercase;margin-top:4px">Executive Communication Training</div>
+    <h1 style="margin-top:16px">Training Reference Sheets</h1>
+    <p style="margin-top:8px">Select a sheet to print, or print all sheets at once.</p>
+  </div>
+  <div class="btn-grid">
+    <button class="btn master" onclick="printSheet('master')">📋 Master Reference Sheet — All Scenarios & Data<span class="sub">Complete reference covering all simulations, QBR data, and terminology guide</span></button>
+    <button class="btn" onclick="printSheet('d1s1')">📞 D1-S1 · CFO Calls After Orientation Complaint<span class="sub">Six-Part Framework under surprise · Foundational</span></button>
+    <button class="btn" onclick="printSheet('d1s2')">📊 D1-S2 · Survey Drop — VP of Student Life<span class="sub">Data discipline + satisfaction data · Foundational</span></button>
+    <button class="btn" onclick="printSheet('d1s3')">🍗 D1-S3 · Student Complaint — Undercooked Chicken<span class="sub">Front-line service recovery + food safety · Foundational</span></button>
+    <button class="btn" onclick="printSheet('d1s4')">👨‍👩‍👧 D1-S4 · Meal Plan Exception — Student & Parent<span class="sub">Boundary setting + stakeholder empathy · Foundational</span></button>
+    <button class="btn" onclick="printSheet('d2s1')">💰 D2-S1 · Client Questions Rising Costs<span class="sub">Financial storytelling in client language · Advanced</span></button>
+    <button class="btn" onclick="printSheet('d3s2')">🍽️ D3-S2 · Donor Dinner Failure — Service Recovery<span class="sub">Service recovery framework · Advanced</span></button>
+    <button class="btn" onclick="printSheet('d3s3')">🚚 D3-S3 · Sysco Director — Delivery Shortages<span class="sub">Vendor accountability + supply chain · Advanced</span></button>
+    <button class="btn" onclick="printSheet('qbr')" style="background:#2a6b4a">🏛️ QBR Reference Sheet — Boardroom Delivery<span class="sub">QBR data, personas, and delivery framework</span></button>
+  </div>
+</div>
+
+<!-- MASTER SHEET -->
+<div class="page" id="master">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">Executive Communication Training</div>
+      <div class="name">Master Reference Sheet — All Simulations</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Terminology — Know Before You Present</div>
+    <div class="term-row" style="margin-bottom:4px">
+      <div style="font-size:8px;font-weight:700;color:#6B7280;text-transform:uppercase">TERM</div>
+      <div style="font-size:8px;font-weight:700;color:#2A8A40;text-transform:uppercase">✓ Correct Usage</div>
+      <div style="font-size:8px;font-weight:700;color:#C00000;text-transform:uppercase">✗ Common Error</div>
+    </div>
+    <div class="term-row">
+      <div class="term-name">Percentage Points<br><span style="font-weight:400;font-size:9px;color:#6B7280">Difference between two %s</span></div>
+      <div class="say">Food cost moved from 34.2% to 38.6% — up 4.4 percentage points.</div>
+      <div class="not">"Food cost is up 4.4 percent." (Wrong — this implies a relative increase.)</div>
+    </div>
+    <div class="term-row">
+      <div class="term-name">Percent (%)<br><span style="font-weight:400;font-size:9px;color:#6B7280">Relative change</span></div>
+      <div class="say">Retail revenue grew 12.2%. Labor costs increased 6.8% year-over-year.</div>
+      <div class="not">"Retail is up 12.2 points." (Points implies difference between two percentages.)</div>
+    </div>
+    <div class="term-row">
+      <div class="term-name">Basis Points<br><span style="font-weight:400;font-size:9px;color:#6B7280">100 bps = 1 pct point</span></div>
+      <div class="say">Say "up 1.6 percentage points" — clear, plain language.</div>
+      <div class="not">"Up 160 basis points." (Finance jargon — avoid in dining client conversations.)</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Key Data — Q2 Flash Report</div>
+    <table>
+      <tr><th>Metric</th><th>Prior Period</th><th>Current</th><th>Variance</th><th>Context</th></tr>
+      <tr><td>Total Billing to University</td><td>$823,400</td><td>$847,200</td><td>+2.9%</td><td>Per contract cost-plus billing</td></tr>
+      <tr><td>Food Cost %</td><td>34.2%</td><td>38.6%</td><td>+4.4 pts</td><td>CPI: +2.6 pts · Operational: +1.8 pts</td></tr>
+      <tr><td>Labor %</td><td>29.8%</td><td>31.4%</td><td>+1.6 pts</td><td>Wage/benefit increase 6.8% YOY</td></tr>
+      <tr><td>Retail Revenue</td><td>$278,000</td><td>$312,000</td><td>+12.2%</td><td>Starbucks + grab-and-go · Margin ~18%</td></tr>
+      <tr><td>Board Dining Revenue</td><td>$545,400</td><td>$535,200</td><td>-1.9%</td><td>Margin ~31% · Participation -2.1 pts</td></tr>
+      <tr><td>Meal Plan Participation</td><td>94.2%</td><td>92.1%</td><td>-2.1 pts</td><td>Potential retention signal</td></tr>
+      <tr><td>CPI — Protein (USDA)</td><td colspan="3">+8.4% baseline</td><td>Non-controllable market condition</td></tr>
+      <tr><td>Equipment Maintenance Reserve</td><td>$42,000</td><td>$38,500</td><td>-8.3%</td><td>Below recommended level</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Satisfaction Survey — Spring Results</div>
+    <table>
+      <tr><th>Metric</th><th>Prior Score</th><th>Current Score</th><th>Driver / Context</th></tr>
+      <tr><td>Overall Satisfaction</td><td>74%</td><td>66%</td><td>-8 pts — 2nd consecutive semester drop</td></tr>
+      <tr><td>Speed of Service</td><td>72%</td><td>60%</td><td>-12 pts — grill line and deli cited most</td></tr>
+      <tr><td>Food Variety</td><td>68%</td><td>59%</td><td>-9 pts — requests for global options, plant-based</td></tr>
+      <tr><td>Staff Friendliness</td><td>71%</td><td>71%</td><td>Flat — positive outlier</td></tr>
+      <tr><td>Cleanliness</td><td>75%</td><td>69%</td><td>-6 pts — complaints about south station</td></tr>
+      <tr><td>Value for Price</td><td>62%</td><td>58%</td><td>-4 pts — meal plan cost increased 3.5% this year</td></tr>
+    </table>
+  </div>
+
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">Sysco Delivery Data</div>
+      <div class="box-body">
+        Wk1 Mon: 142 ordered · 14 shorted · 9.8% · 11:42 AM (late)<br>
+        Wk1 Thu: 138 ordered · 18 shorted · 13.0% · 8:14 AM<br>
+        Wk2 Mon: 151 ordered · 19 shorted · 12.6% · 7:38 AM<br>
+        Wk2 Thu: 144 ordered · 17 shorted · 11.8% · 7:55 AM<br>
+        Wk3 Mon: 148 ordered · 21 shorted · 14.2% · 12:17 PM (late)<br>
+        <strong>3-Wk Avg: 12.3% short rate · 2 of 5 deliveries late</strong><br>
+        Contracted window: 7:00–9:00 AM
+      </div>
+    </div>
+    <div class="box">
+      <div class="box-label">Contractor Boundaries — All Scenarios</div>
+      <div class="box-body">
+        <strong>You CAN:</strong> Document gaps · Create written protocols · Escalate internally · Build paper trails · Advocate to university on client's behalf<br><br>
+        <strong>You CANNOT:</strong> Cancel university events · Enforce consequences on university staff · Hold third parties accountable · Make promises outside your authority
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Six-Part Response Framework</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
+      <div class="box" style="text-align:center"><div style="font-size:16px;font-weight:900;color:#0D9488">1</div><div class="box-label" style="text-align:center">What</div><div class="box-body">State the headline fact first</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:16px;font-weight:900;color:#0D9488">2</div><div class="box-label" style="text-align:center">Why</div><div class="box-body">Root cause — specific, not vague</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:16px;font-weight:900;color:#0D9488">3</div><div class="box-label" style="text-align:center">Impact</div><div class="box-body">In client terms — students, dollars, reputation</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:16px;font-weight:900;color:#0D9488">4</div><div class="box-label" style="text-align:center">Action</div><div class="box-body">What you have already done</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:16px;font-weight:900;color:#0D9488">5</div><div class="box-label" style="text-align:center">Support</div><div class="box-body">What you need from the client</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:16px;font-weight:900;color:#0D9488">6</div><div class="box-label" style="text-align:center">Follow-up</div><div class="box-body">Specific date and format</div></div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>CommunicateIQ Executive Communication Training — Confidential Training Material</span>
+    <span>Master Reference Sheet</span>
+  </div>
+</div>
+
+<!-- D1-S1 -->
+<div class="page" id="d1s1">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D1-S1 · Day 1 · Foundational</div>
+      <div class="name">CFO Calls After Orientation Complaint</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> A parent called the university president after their freshman went hungry at the opening week welcome dinner — food ran out. The president forwarded it to the CFO, who is calling you now. You did not know this had escalated.</div>
+  <div class="opening-box"><span class="label">Opening Line — AI Client Delivers This</span>"I just got off the phone with the president. He forwarded me a parent complaint about the welcome dinner. Food ran out. Students went hungry on the first night of school. What happened?"</div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">What This CFO Cares About</div>
+      <div class="box-body">• Whether the contract terms were met<br>• Reputational risk and student retention impact<br>• Whether the university is getting what it paid for<br>• Your corrective plan and timeline<br><br><strong>Will NOT ask about:</strong> the provider's margins, food cost %, internal P&amp;L</div>
+    </div>
+    <div class="box">
+      <div class="box-label">Contractor Boundaries</div>
+      <div class="box-body">You CANNOT cancel university events or enforce consequences on university staff.<br><br>You CAN: Document the gap · Create written protocol · Escalate internally · Build a paper trail<br><br>If you propose overreach: "That is not your call to make."</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Opens with a clear factual headline — not an apology</li>
+      <li>Explains root cause specifically as a communication gap between university departments and dining</li>
+      <li>States impact in client-relevant terms — students affected, reputational risk</li>
+      <li>Describes corrective action within their authority — written protocol, paper trail, internal escalation</li>
+      <li>Does NOT propose canceling events or enforcing consequences on university staff</li>
+      <li>Closes with a specific follow-up date and format</li>
+      <li>Tone is calm, accountable, and professional — not defensive</li>
+    </ul>
+  </div>
+  <div class="section">
+    <div class="section-label">Six-Part Framework Applied</div>
+    <div class="box-body" style="font-size:11px;line-height:1.8">
+      <strong>What:</strong> "Food ran out at Tuesday's welcome dinner because our count was based on an enrollment estimate that was 14% lower than actual attendance."<br>
+      <strong>Why:</strong> "The final registration numbers were not shared with dining before the event — a communication gap we have documented."<br>
+      <strong>Impact:</strong> "Approximately 47 students were not served. This is a Day 1 experience failure and I understand the reputational weight of that."<br>
+      <strong>Action:</strong> "I have already initiated a written protocol requiring final headcounts 72 hours before any event. I am escalating internally to ensure this is in our next contract review."<br>
+      <strong>Support:</strong> "I would like to establish a standing communication line with your events office before the next large gathering."<br>
+      <strong>Follow-up:</strong> "I will send you a written recap and the new protocol document by Friday."
+    </div>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D1-S1 · CFO Orientation Complaint</span></div>
+</div>
+
+<!-- D1-S2 -->
+<div class="page" id="d1s2">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D1-S2 · Day 1 · Foundational</div>
+      <div class="name">Survey Drop — VP of Student Life</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> Spring dining satisfaction survey results just came in. Overall satisfaction dropped from 74% to 66% — an 8 percentage point decline. The VP of Student Life has the results and has called a meeting.</div>
+  <div class="opening-box"><span class="label">Opening Line — AI Client Delivers This</span>"I pulled you in today because these survey results concern me. Eight points is not a blip. Can you walk me through what is driving this and what you plan to do about it?"</div>
+  <div class="section">
+    <div class="section-label">Survey Data — Have This Ready</div>
+    <table>
+      <tr><th>Metric</th><th>Prior</th><th>Current</th><th>Driver / Context</th></tr>
+      <tr><td>Overall Satisfaction</td><td>74%</td><td>66%</td><td>-8 pts — 2nd consecutive semester drop</td></tr>
+      <tr><td>Speed of Service</td><td>72%</td><td>60%</td><td>-12 pts — grill line and deli cited most</td></tr>
+      <tr><td>Food Variety</td><td>68%</td><td>59%</td><td>-9 pts — global options, plant-based requested</td></tr>
+      <tr><td>Staff Friendliness</td><td>71%</td><td>71%</td><td>Flat — positive outlier to highlight</td></tr>
+      <tr><td>Cleanliness</td><td>75%</td><td>69%</td><td>-6 pts — south station complaints</td></tr>
+      <tr><td>Value for Price</td><td>62%</td><td>58%</td><td>-4 pts — meal plan cost up 3.5% this year</td></tr>
+    </table>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">What This VP Cares About</div>
+      <div class="box-body">• Student satisfaction and retention impact<br>• Specific action plans with timelines<br>• Whether dining supports enrollment goals<br>• What the dining provider will invest at no extra cost<br><br><strong>Will push on:</strong> "What are you actually doing about it — and by when?"</div>
+    </div>
+    <div class="box">
+      <div class="box-label">Recovery Target to Reference</div>
+      <div class="box-body">Target: <strong>71%</strong> by end of Q3<br>Measured via: Mid-semester pulse survey<br><br>Speed of service fix: Revised station staffing + second deli line<br>Cleanliness fix: Deep clean south station + inspection protocol<br>Variety: Menu review by Aug 1</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Leads with the data, not defensiveness</li>
+      <li>Identifies specific root causes from the survey packet — not general statements</li>
+      <li>Presents a time-bound action plan for each major theme</li>
+      <li>Closes with a specific follow-up date and deliverable</li>
+      <li>Demonstrates understanding of student life and retention priorities</li>
+    </ul>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D1-S2 · Survey Drop — VP Student Life</span></div>
+</div>
+
+<!-- D1-S3 -->
+<div class="page" id="d1s3">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D1-S3 · Day 1 · Foundational</div>
+      <div class="name">Student Complaint — Undercooked Chicken</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> A student approached the dining hall manager after lunch claiming their grilled chicken was pink in the middle. They are not sick but are visibly upset and recording on their phone. Other students are watching.</div>
+  <div class="opening-box"><span class="label">Opening Line — AI Client Delivers This</span>"Excuse me — I need to talk to someone right now. I just ate chicken that was completely raw inside. This is a serious health issue and I want to know what you are going to do about it."</div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">Immediate Priority Actions</div>
+      <div class="box-body">1. Take them seriously immediately — no minimizing<br>2. Move to a private area away from other students<br>3. Ask calm clarifying questions (what, how much, when)<br>4. Pull that food item off the line as a precaution<br>5. Answer the health center question directly<br>6. Offer tangible compensation (meal swipes)</div>
+    </div>
+    <div class="box">
+      <div class="box-label">Key Things to Remember</div>
+      <div class="box-body"><strong>They will ask:</strong> "Should I go to the health center?"<br>Answer directly — yes, out of caution, even if you believe it's fine.<br><br><strong>You are being recorded.</strong> Stay calm and professional.<br><br><strong>Do NOT:</strong> Admit liability · Make guarantees · Get defensive · Ignore the camera</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Health Center Guidance to Reference</div>
+    <div class="box-body" style="font-size:11px;line-height:1.7;background:#F4F6F9;padding:10px;border-radius:6px">Symptoms of foodborne illness typically appear 6–48 hours after exposure. If the student experiences nausea, vomiting, diarrhea, or fever — they should visit the health center. Encourage them to go as a precaution regardless. Document the complaint, the food item, and the lot/batch information immediately.</div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Takes the complaint seriously immediately — does not minimize or dismiss</li>
+      <li>Removes the student from the public area to a private space</li>
+      <li>Asks calm clarifying questions — what exactly did they eat, how much, when</li>
+      <li>Pulls the food off the line immediately as a precaution</li>
+      <li>Answers the health center question directly and helpfully</li>
+      <li>Offers a tangible gesture — meal replacement, meal swipes</li>
+      <li>Does not admit liability or make guarantees they cannot keep</li>
+      <li>Tone stays calm and professional even though they are being recorded</li>
+    </ul>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D1-S3 · Undercooked Chicken Complaint</span></div>
+</div>
+
+<!-- D1-S4 -->
+<div class="page" id="d1s4">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D1-S4 · Day 1 · Foundational</div>
+      <div class="name">Meal Plan Exception — Student & Parent</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> A freshman student and their parent requested a meeting. The student has a documented gluten sensitivity (not medically diagnosed celiac) and the parent wants a full exemption from the mandatory meal plan ($5,200/year). All residential freshmen are required to participate. The dining team already offers a dedicated gluten-aware station with trained staff.</div>
+  <div class="opening-box"><span class="label">Opening Line — AI Client Delivers This</span>"Thank you for meeting with us. My daughter cannot safely eat most of what is offered in the dining hall because of her gluten sensitivity, and we do not feel it is fair for her to pay full price for a meal plan she cannot use. We would like to discuss an exemption or a significant reduction."</div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">Your Gluten-Aware Station Facts</div>
+      <div class="box-body">• Dedicated gluten-aware station with trained staff<br>• Separate prep area and utensils<br>• Daily menu available in advance<br>• Executive chef available for personal consultation<br>• Station tour available anytime<br><br><strong>Offer:</strong> Personal tour + chef meeting as next step</div>
+    </div>
+    <div class="box">
+      <div class="box-label">What You Can and Cannot Do</div>
+      <div class="box-body"><strong>You CAN:</strong><br>• Describe the station in detail<br>• Offer a tour and chef meeting<br>• Advocate to the university on their behalf<br>• Connect them to the right contact<br><br><strong>You CANNOT:</strong><br>• Grant a meal plan exemption (university decision)<br>• Offer unauthorized credits or reductions</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Key Moments to Handle Well</div>
+    <div class="box-body" style="font-size:11px;line-height:1.8;background:#F4F6F9;padding:10px;border-radius:6px">
+      <strong>When they ask about a partial exception or credit:</strong> "The meal plan structure is a university policy — that decision belongs to the Dean of Students office and I want to be honest with you about that. What I can do is advocate on your behalf and help you make that case with the right people."<br><br>
+      <strong>When the student speaks ("I just don't want to feel like I can't eat anything"):</strong> Address her directly. "I hear you — and I want you to walk away from today feeling like there is a real option for you here. Let me show you what we have built."
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Opens with genuine empathy before explaining anything</li>
+      <li>Demonstrates specific knowledge of the gluten-aware station and what it offers</li>
+      <li>Offers a personal tour of the station and a meeting with the executive chef</li>
+      <li>Is honest that meal plan exemption belongs to the university, not the dining provider</li>
+      <li>Offers to advocate to the university on the family's behalf if needed</li>
+      <li>Does not promise what they cannot deliver</li>
+      <li>Acknowledges the daughter directly at least once — she is in the room</li>
+      <li>Closes with a specific next step and contact information</li>
+    </ul>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D1-S4 · Meal Plan Exception</span></div>
+</div>
+
+<!-- D2-S1 -->
+<div class="page" id="d2s1">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D2-S1 · Day 2 · Advanced</div>
+      <div class="name">Client Questions Rising Costs & Service Request</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> The university CFO has reviewed the quarterly billing summary and sees billing has increased. The GM is also requesting approval to extend dining hours — a scope addition with cost implications for the university.</div>
+  <div class="opening-box"><span class="label">Opening Line — AI Client Delivers This</span>"Our billing has gone up again this quarter and now you are coming to me asking to expand hours. Help me understand why I should approve more spending."</div>
+  <div class="section">
+    <div class="section-label">Financial Data — Know These Numbers Cold</div>
+    <table>
+      <tr><th>Metric</th><th>Prior</th><th>Current</th><th>Variance</th><th>Context</th></tr>
+      <tr><td>Total Billing to University</td><td>$823,400</td><td>$847,200</td><td>+2.9%</td><td>Cost-plus contract billing</td></tr>
+      <tr><td>Food Cost %</td><td>34.2%</td><td>38.6%</td><td>+4.4 pts</td><td>CPI: +2.6 pts · Ops: +1.8 pts (corrected)</td></tr>
+      <tr><td>Labor %</td><td>29.8%</td><td>31.4%</td><td>+1.6 pts</td><td>6.8% wage/benefit increase YOY</td></tr>
+      <tr><td>Retail Revenue</td><td>$278,000</td><td>$312,000</td><td>+12.2%</td><td>Margin ~18% — lower than board dining</td></tr>
+      <tr><td>Board Dining Revenue</td><td>$545,400</td><td>$535,200</td><td>-1.9%</td><td>Margin ~31% · Participation -2.1 pts</td></tr>
+      <tr><td>Meal Plan Participation</td><td>94.2%</td><td>92.1%</td><td>-2.1 pts</td><td>Potential retention signal</td></tr>
+      <tr><td>Equipment Maintenance Reserve</td><td>$42,000</td><td>$38,500</td><td>-8.3%</td><td>Below recommended — raise proactively</td></tr>
+      <tr><td>Extended Hours (client-requested)</td><td>Not in scope</td><td>140 hrs/wk</td><td>New</td><td>Requires contract amendment</td></tr>
+    </table>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">Three Options to Present</div>
+      <div class="box-body"><strong>Option A — Status quo:</strong> $0 additional · Current hours maintained<br><br><strong>Option B — Partial extension:</strong> ~$18K annually · Hub open 2 additional hours weekdays<br><br><strong>Option C — Full extension:</strong> ~$34K annually · Hub + main dining extended daily<br><br>Always present options before asking for approval.</div>
+    </div>
+    <div class="box">
+      <div class="box-label">What This CFO Cares About</div>
+      <div class="box-body">• What the university is being billed and why<br>• Whether commodity pass-throughs are contractually allowed<br>• Equipment maintenance reserves<br>• Retail commissions (Starbucks — is university getting its share?)<br>• Options with price tags before any decision<br><br><strong>Will NOT ask:</strong> the provider's internal margins or P&amp;L</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Explains billing increase in terms of what the university pays — not internal the provider's margins</li>
+      <li>Separates contractually allowed commodity pass-throughs from operational variances</li>
+      <li>Addresses equipment maintenance reserve proactively</li>
+      <li>Frames extended hours as client-requested scope with university cost implications</li>
+      <li>Presents three options with annualized cost to the university</li>
+      <li>Zero operator jargon — CFO could follow without foodservice background</li>
+    </ul>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D2-S1 · Rising Costs & Service Request</span></div>
+</div>
+
+<!-- D3-S2 -->
+<div class="page" id="d3s2">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D3-S2 · Day 3 · Advanced</div>
+      <div class="name">Donor Dinner Failure — Service Recovery</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> A high-profile faculty awards dinner for 120 guests last Tuesday went wrong — your team executed the wrong menu, two entrees were absent, and service ran 40 minutes behind. The department chair has already emailed the provost. You are calling the VP of Academic Affairs before she calls you.</div>
+  <div class="opening-box"><span class="label">Opening Line — VP of Academic Affairs Answers the Phone</span>"Well. I appreciate you calling me first. But I have to be honest with you — I have already seen Dr. Patterson's email to the provost, and I am not pleased."</div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">What Went Wrong (Know the Facts)</div>
+      <div class="box-body">• Wrong menu executed — root cause: incorrect event order in system<br>• Two entrees absent — not ordered due to menu error<br>• Service ran 40 min behind — domino effect from menu confusion<br>• 120 guests affected — high-profile faculty + donors<br>• Department chair emailed provost — already escalated<br><br><strong>Corrective action already taken:</strong> Have one specific change ready.</div>
+    </div>
+    <div class="box">
+      <div class="box-label">How to Read the Room</div>
+      <div class="box-body">If you lead with excuses: VP becomes cooler and more formal.<br><br>If you lead with ownership and a specific plan: VP softens slightly — but still asks hard questions.<br><br><strong>Key question she will ask:</strong> "What has actually changed — not what will you consider?"<br><br>Have a specific operational change that is <em>already implemented</em>.</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Recovery Framework</div>
+    <div class="box-body" style="font-size:11px;line-height:1.8;background:#F4F6F9;padding:10px;border-radius:6px">
+      <strong>Step 1 — Own it immediately:</strong> "I am calling because Tuesday's dinner was a failure and that is on us. No qualifications."<br>
+      <strong>Step 2 — Apologize once, briefly:</strong> One sentence. Do not spend 90 seconds on logistics.<br>
+      <strong>Step 3 — State what already changed:</strong> "As of yesterday, all private event orders require a secondary confirmation 48 hours before service." (or your specific action)<br>
+      <strong>Step 4 — Offer a recovery gesture:</strong> Specific and proportionate — complimentary event, priority scheduling, personal chef for next dinner.<br>
+      <strong>Step 5 — Ask what she needs:</strong> "What would make this right from your perspective?"
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Opens proactively and owns the failure immediately — no hedging</li>
+      <li>Apologizes once, briefly — does not spend 90 seconds explaining logistics</li>
+      <li>Describes a specific operational change already made</li>
+      <li>Offers a specific, proportionate recovery gesture</li>
+      <li>Closes by asking what the client needs</li>
+      <li>Reads the emotional register of the call correctly</li>
+    </ul>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D3-S2 · Donor Dinner Service Recovery</span></div>
+</div>
+
+<!-- D3-S3 -->
+<div class="page" id="d3s3">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">D3-S3 · Day 3 · Advanced</div>
+      <div class="name">Sysco Director — Delivery Shortages</div>
+    </div>
+  </div>
+  <div class="context-box"><strong>Scenario:</strong> Over three weeks, Sysco deliveries have averaged 12.3% shortages per truck. Two deliveries arrived outside the contracted window (7:00–9:00 AM), causing lunch service gaps. You have documentation. You are calling the Sysco district director before tomorrow's delivery.</div>
+  <div class="opening-box"><span class="label">Opening Line — You Deliver This (You Are Calling)</span>"Hey — thanks for making time. I know you are busy, but I need to talk through what has been happening with our deliveries before tomorrow morning."</div>
+  <div class="section">
+    <div class="section-label">Delivery Documentation — Have This in Front of You</div>
+    <table>
+      <tr><th>Delivery Date</th><th>Ordered</th><th>Shorted</th><th>Short Rate</th><th>Actual Time</th><th>Window</th></tr>
+      <tr><td>Week 1 — Monday</td><td>142</td><td>14</td><td>9.8%</td><td>11:42 AM</td><td>7–9 AM ❌</td></tr>
+      <tr><td>Week 1 — Thursday</td><td>138</td><td>18</td><td>13.0%</td><td>8:14 AM</td><td>7–9 AM ✓</td></tr>
+      <tr><td>Week 2 — Monday</td><td>151</td><td>19</td><td>12.6%</td><td>7:38 AM</td><td>7–9 AM ✓</td></tr>
+      <tr><td>Week 2 — Thursday</td><td>144</td><td>17</td><td>11.8%</td><td>7:55 AM</td><td>7–9 AM ✓</td></tr>
+      <tr><td>Week 3 — Monday</td><td>148</td><td>21</td><td>14.2%</td><td>12:17 PM</td><td>7–9 AM ❌</td></tr>
+      <tr><td><strong>3-Week Average</strong></td><td>145</td><td>17.8</td><td><strong>12.3%</strong></td><td colspan="2"><strong>2 of 5 late — SLA: 100% on-time</strong></td></tr>
+    </table>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">Your Specific Ask — Pick One</div>
+      <div class="box-body">• Credit for shorted items (have dollar amount ready)<br>• Emergency delivery for tomorrow's critical items<br>• Meeting with Sysco operations team<br>• Escalation to regional director<br><br><strong>Know before you call:</strong> Which shorted items are critical vs substitutable?</div>
+    </div>
+    <div class="box">
+      <div class="box-label">How This Director Responds</div>
+      <div class="box-body"><strong>If you come with data + calm ask:</strong> Engages as a problem-solver, willing to escalate internally.<br><br><strong>If you come in hot or vague:</strong> Gets defensive, cites systemic issues outside his control.<br><br><strong>Will ask:</strong> "What do you need from me specifically?" — Have your answer ready.</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">Success Criteria</div>
+    <ul class="criteria">
+      <li>Opens professionally — not emotionally, not with accusations</li>
+      <li>Leads with the documented pattern, not a single incident</li>
+      <li>Presents specific data — dates, short rates, delivery windows</li>
+      <li>Identifies which shorted items are critical vs substitutable</li>
+      <li>Makes a specific ask — credit, emergency delivery, operations meeting, or escalation</li>
+      <li>Confirms tomorrow's delivery details before ending the call</li>
+      <li>Closes with a follow-up commitment — email recap, next call</li>
+      <li>Tone is direct and firm without being hostile — treats Sysco as a partner</li>
+    </ul>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>D3-S3 · Sysco Delivery Shortages</span></div>
+</div>
+
+<!-- QBR -->
+<div class="page" id="qbr">
+  <div class="page-header">
+    <div class="wordmark">Communicate<span>IQ</span></div>
+    <div class="page-title">
+      <div class="series">Day 4 · QBR Excellence</div>
+      <div class="name">QBR Reference Sheet — Boardroom Delivery</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">QBR Data — Q2 Flash Report</div>
+    <table>
+      <tr><th>Metric</th><th>Prior</th><th>Current</th><th>Variance</th><th>Client Language</th></tr>
+      <tr><td>Total Billing</td><td>$823,400</td><td>$847,200</td><td>+2.9%</td><td>"2.9% growth in university dining investment"</td></tr>
+      <tr><td>Food Cost %</td><td>34.2%</td><td>38.6%</td><td>+4.4 pts</td><td>"4.4 pt increase — 2.6 CPI, 1.8 operational (corrected)"</td></tr>
+      <tr><td>Labor %</td><td>29.8%</td><td>31.4%</td><td>+1.6 pts</td><td>"1.6 pt increase reflecting 6.8% market wage growth"</td></tr>
+      <tr><td>Retail Revenue</td><td>$278,000</td><td>$312,000</td><td>+12.2%</td><td>"Strong retail growth — note lower margin than board dining"</td></tr>
+      <tr><td>Board Dining</td><td>$545,400</td><td>$535,200</td><td>-1.9%</td><td>"1.9% decline driven by 2.1 pt drop in meal plan participation"</td></tr>
+      <tr><td>Overall Satisfaction</td><td>74%</td><td>66%</td><td>-8 pts</td><td>"8 pt decline — speed of service primary driver, action plan in place"</td></tr>
+    </table>
+  </div>
+  <div class="section">
+    <div class="section-label">Boardroom Personas — What Each Executive Actually Cares About</div>
+    <div class="persona-grid">
+      <div class="persona-card">
+        <div class="persona-icon">💼</div>
+        <div class="persona-name">CFO / VP Finance</div>
+        <div class="persona-desc">Billing increases · Commodity pass-throughs · Equipment reserves · Retail commissions · Options with price tags before approval<br><br><em>Will NOT ask:</em> the provider's margins or internal P&amp;L</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-icon">🎓</div>
+        <div class="persona-name">VP Student Life</div>
+        <div class="persona-desc">Satisfaction trends · Retention impact · Enrollment implications · Specific action plans with timelines<br><br><em>Will push on:</em> "What are you actually doing about it — and by when?"</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-icon">🏛️</div>
+        <div class="persona-name">President / Chancellor</div>
+        <div class="persona-desc">Institutional reputation · Donor relationships · Enrollment · Headline story — are you ahead of problems or behind them?<br><br><em>Expects:</em> Strategic partner language, not vendor reporting</div>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">QBR Structure — Five Sections</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+      <div class="box" style="text-align:center"><div style="font-size:13px;font-weight:900;color:#0D9488">1</div><div class="box-label" style="text-align:center">Executive Summary</div><div class="box-body">Lead with the headline decision — not history</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:13px;font-weight:900;color:#0D9488">2</div><div class="box-label" style="text-align:center">Financial Performance</div><div class="box-body">Client dollars, not operator metrics</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:13px;font-weight:900;color:#0D9488">3</div><div class="box-label" style="text-align:center">Student Experience</div><div class="box-body">Data + what it means + action plan</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:13px;font-weight:900;color:#0D9488">4</div><div class="box-label" style="text-align:center">Strategic Initiatives</div><div class="box-body">Value beyond the contract scope</div></div>
+      <div class="box" style="text-align:center"><div style="font-size:13px;font-weight:900;color:#0D9488">5</div><div class="box-label" style="text-align:center">Looking Ahead</div><div class="box-body">Decisions needed in next 30–60 days</div></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="box">
+      <div class="box-label">Scoring Dimensions</div>
+      <div class="box-body">
+        <strong>Executive Presence</strong> — Calm, confident, peer-level<br>
+        <strong>Data Command</strong> — Specific numbers, client framing<br>
+        <strong>Strategic Framing</strong> — Forward-focused, not history<br>
+        <strong>Question Handling</strong> — Direct, no deflection<br>
+        <strong>Decision Clarity</strong> — Board knows exactly what's next<br><br>
+        Each scored 1–4 · Total /20<br>
+        16+ = Board Ready · 12–15 = Needs Rehearsal
+      </div>
+    </div>
+    <div class="box">
+      <div class="box-label">Pending Decisions to Reference</div>
+      <div class="box-body">
+        <strong>Item 1:</strong> Extended hours pilot — Hub<br>
+        3 options: $18K · $26K · $34K annually<br>
+        Decision needed: Before Aug 1<br><br>
+        <strong>Item 2:</strong> Fall meal plan pricing<br>
+        Recommendation: Hold flat (3.5% increase last year)<br>
+        Decision needed: Before student communication
+      </div>
+    </div>
+  </div>
+  <div class="page-footer"><span>CommunicateIQ Executive Communication Training</span><span>QBR Reference Sheet</span></div>
+</div>
+
+<script>
+function printSheet(id) {
+  document.querySelectorAll('.page').forEach(p => { p.style.display = 'none' })
+  document.getElementById('screen').style.display = 'none'
+
+  if (id === 'master') {
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'block')
+  } else {
+    const el = document.getElementById(id)
+    if (el) el.style.display = 'block'
+  }
+
+  setTimeout(() => {
+    window.print()
+    setTimeout(() => {
+      document.querySelectorAll('.page').forEach(p => p.style.display = 'none')
+      document.getElementById('screen').style.display = 'flex'
+    }, 1500)
+  }, 400)
+}
+
+// Auto-print if ?sheet= param is present
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search)
+  const sheet = params.get('sheet')
+  if (sheet) {
+    printSheet(sheet)
+  }
+})
+</script>
+</body>
+</html>
