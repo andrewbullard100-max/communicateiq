@@ -8,10 +8,12 @@ import { SCENARIO_META } from '../../../lib/scenarioMeta'
 const CLIENT_TRAINING_TYPES = [
   'executive-communication', 'client-relations',
   'family-resident-relations', 'care-team-escalation', 'district-family-relations',
+  'facilities-maintenance', 'facilities-housekeeping',
 ]
 const LEADERSHIP_TRAINING_TYPES = [
   'raw-material-cost-control', 'labor-cost-management',
   'team-buy-in', 'team-accountability',
+  'facilities-maintenance-leadership', 'facilities-housekeeping-leadership',
 ]
 
 export async function GET(request) {

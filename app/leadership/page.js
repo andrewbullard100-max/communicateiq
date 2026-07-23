@@ -10,6 +10,8 @@ const TOPIC_LABELS = {
   'labor-cost-management': 'Labor Cost',
   'team-buy-in': 'Team Buy-In',
   'team-accountability': 'Accountability',
+  'facilities-maintenance-leadership': 'Facilities — Maintenance',
+  'facilities-housekeeping-leadership': 'Facilities — Housekeeping',
 }
 
 function buildSystemPrompt(scenario) {
