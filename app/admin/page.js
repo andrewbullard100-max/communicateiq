@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { C } from '../../lib/data'
+import { C, INDUSTRIES, TRAINING_TYPES } from '../../lib/data'
 
 const ROLES = [
   { id: 'learner', label: 'Learner' },
@@ -23,6 +23,11 @@ function fmtDate(iso) {
 
 export default function AdminConsole() {
   const { data: session, status } = useSession()
+  const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
+  const REVIEWER_ROLES_CLIENT = ['content_approver', 'org_admin', 'corporate_admin']
+  const canManagePolicies = CONTENT_ROLES.includes(session?.user?.role)
+  const canReviewPolicies = REVIEWER_ROLES_CLIENT.includes(session?.user?.role)
+  const isOrgAdmin = ['org_admin', 'corporate_admin'].includes(session?.user?.role)
   const [tab, setTab] = useState('users')
   const [users, setUsers] = useState([])
   const [events, setEvents] = useState([])
@@ -34,7 +39,7 @@ export default function AdminConsole() {
   const [ssoBusy, setSsoBusy] = useState(false)
   const [ssoForm, setSsoForm] = useState({ enabled: false, provider: '', domain: '', tenantId: '' })
   const [loading, setLoading] = useState(true)
-  const [forbidden, setForbidden] = useState(false)
+  const forbidden = !loading && !isOrgAdmin && !canManagePolicies
   const [showAdd, setShowAdd] = useState(false)
   const [tempPasswordFor, setTempPasswordFor] = useState(null) // { name, email, password }
   const [busyId, setBusyId] = useState(null)
@@ -43,7 +48,13 @@ export default function AdminConsole() {
   const loadUsers = () => {
     fetch('/api/admin/users')
       .then(async res => {
-        if (res.status === 403) { setForbidden(true); setLoading(false); return }
+        if (res.status === 403) {
+          // Not org_admin+, so /users is off-limits — but they may still
+          // have content_author/content_approver access to Policies. Only
+          // show the hard "forbidden" lock screen if they have neither.
+          setLoading(false)
+          return
+        }
         const data = await res.json()
         setUsers(data.users || [])
         setLoading(false)
@@ -55,6 +66,12 @@ export default function AdminConsole() {
     if (status !== 'authenticated') return
     loadUsers()
   }, [status])
+
+  useEffect(() => {
+    if (status !== 'authenticated' || loading) return
+    if (!isOrgAdmin && canManagePolicies) setTab('policies')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, loading])
 
   useEffect(() => {
     if (status !== 'authenticated' || tab !== 'activity') return
@@ -139,6 +156,136 @@ export default function AdminConsole() {
     } catch (err) {
       setToast({ type: 'error', text: err.message })
       setBillingBusy(false)
+    }
+  }
+
+  // ── Policies (org policy documents + AI-generated content) ────────────────
+  const [policyDocs, setPolicyDocs] = useState([])
+  const [policyDocsLoading, setPolicyDocsLoading] = useState(false)
+  const [policyUploading, setPolicyUploading] = useState(false)
+  const [drafts, setDrafts] = useState({ scenarios: [], moduleConfig: [] })
+  const [draftsLoading, setDraftsLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [draftBusyId, setDraftBusyId] = useState(null)
+
+  const loadPolicyDocs = () => {
+    setPolicyDocsLoading(true)
+    fetch('/api/admin/policies')
+      .then(res => res.json())
+      .then(data => setPolicyDocs(data.documents || []))
+      .catch(() => {})
+      .finally(() => setPolicyDocsLoading(false))
+  }
+
+  const loadDrafts = () => {
+    if (!REVIEWER_ROLES_CLIENT.includes(session?.user?.role)) return
+    setDraftsLoading(true)
+    fetch('/api/admin/policies/drafts')
+      .then(res => res.json())
+      .then(data => setDrafts({ scenarios: data.scenarios || [], moduleConfig: data.moduleConfig || [] }))
+      .catch(() => {})
+      .finally(() => setDraftsLoading(false))
+  }
+
+  useEffect(() => {
+    if (status !== 'authenticated' || tab !== 'policies' || !canManagePolicies) return
+    loadPolicyDocs()
+    loadDrafts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, tab])
+
+  // Documents still in status='processing' won't have extracted_text yet —
+  // poll briefly so the list flips to "Ready" without the user refreshing.
+  useEffect(() => {
+    if (tab !== 'policies') return
+    if (!policyDocs.some(d => d.status === 'processing')) return
+    const t = setTimeout(loadPolicyDocs, 4000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, policyDocs])
+
+  async function handleUploadPolicy(file) {
+    setPolicyUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/admin/policies', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setToast({ type: 'success', text: `${file.name} uploaded.` })
+      loadPolicyDocs()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    } finally {
+      setPolicyUploading(false)
+    }
+  }
+
+  async function handleDeletePolicy(docId) {
+    if (!confirm('Delete this document? Any drafts already generated from it are kept.')) return
+    try {
+      const res = await fetch(`/api/admin/policies/${docId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Delete failed')
+      loadPolicyDocs()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    }
+  }
+
+  async function handleGenerate(form) {
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/admin/policies/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Generation failed')
+      const n = (data.results?.scenarios?.length || 0) + (data.results?.financial ? 1 : 0) + (data.results?.qbr ? 1 : 0)
+      setToast({ type: 'success', text: `Generated ${n} draft item${n === 1 ? '' : 's'} — review below before it reaches trainees.` })
+      loadDrafts()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function handleReviewScenario(id, action) {
+    setDraftBusyId(id)
+    try {
+      const res = await fetch(`/api/admin/policies/scenarios/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update draft')
+      loadDrafts()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    } finally {
+      setDraftBusyId(null)
+    }
+  }
+
+  async function handleReviewModuleConfig(id, action) {
+    setDraftBusyId(id)
+    try {
+      const res = await fetch(`/api/admin/policies/module-config/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update draft')
+      loadDrafts()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    } finally {
+      setDraftBusyId(null)
     }
   }
 
@@ -249,7 +396,7 @@ export default function AdminConsole() {
         <div style={{ background: '#fff', padding: 32, borderRadius: 12, maxWidth: 420, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
           <div style={{ fontWeight: 700, color: C.gold, marginBottom: 6 }}>Admin Console</div>
-          <div style={{ color: '#6B7280', fontSize: 13, marginBottom: 18 }}>The Admin Console is restricted to org_admin accounts and above.</div>
+          <div style={{ color: '#6B7280', fontSize: 13, marginBottom: 18 }}>The Admin Console is restricted to org_admin accounts and above, or content_author/content_approver for the Policies tab.</div>
           <Link href="/" style={{ color: C.communicateiqRed, fontSize: 13, fontWeight: 600 }}>← Back to home</Link>
         </div>
       </div>
@@ -267,20 +414,23 @@ export default function AdminConsole() {
       </div>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px' }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {['users', 'activity', 'billing', 'sso'].map(t => (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          {[
+            ...(isOrgAdmin ? ['users', 'activity', 'billing', 'sso'] : []),
+            ...(canManagePolicies ? ['policies'] : []),
+          ].map(t => (
             <button key={t} onClick={() => setTab(t)}
               style={{
                 padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: 600,
                 background: tab === t ? C.gold : '#fff', color: tab === t ? '#fff' : C.gold,
               }}>
-              {t === 'users' ? 'Users' : t === 'activity' ? 'Sign-In Activity' : t === 'billing' ? 'Billing' : 'SSO'}
+              {t === 'users' ? 'Users' : t === 'activity' ? 'Sign-In Activity' : t === 'billing' ? 'Billing' : t === 'sso' ? 'SSO' : 'Policies'}
             </button>
           ))}
         </div>
 
-        {tab === 'users' && (
+        {tab === 'users' && isOrgAdmin && (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
               <button onClick={() => setShowAdd(true)}
@@ -402,6 +552,24 @@ export default function AdminConsole() {
             form={ssoForm}
             setForm={setSsoForm}
             onSave={handleSaveSso}
+          />
+        )}
+
+        {tab === 'policies' && (
+          <PoliciesPanel
+            docs={policyDocs}
+            docsLoading={policyDocsLoading}
+            uploading={policyUploading}
+            onUpload={handleUploadPolicy}
+            onDelete={handleDeletePolicy}
+            drafts={drafts}
+            draftsLoading={draftsLoading}
+            canReview={canReviewPolicies}
+            generating={generating}
+            onGenerate={handleGenerate}
+            draftBusyId={draftBusyId}
+            onReviewScenario={handleReviewScenario}
+            onReviewModuleConfig={handleReviewModuleConfig}
           />
         )}
       </div>
@@ -634,6 +802,248 @@ function TempPasswordModal({ info, onClose }) {
             Done
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Policies tab ────────────────────────────────────────────────────────────
+
+const STATUS_DOT = { processing: '#b87333', processed: C.green, error: C.red }
+const STATUS_TEXT = { processing: 'Processing…', processed: 'Ready', error: 'Error' }
+const ACCEPTED_EXT = '.pdf,.docx,.txt,.md'
+
+function fmtBytesFilename(name) {
+  return name.length > 44 ? name.slice(0, 41) + '…' : name
+}
+
+function PoliciesPanel({
+  docs, docsLoading, uploading, onUpload, onDelete,
+  drafts, draftsLoading, canReview, generating, onGenerate, draftBusyId,
+  onReviewScenario, onReviewModuleConfig,
+}) {
+  const [dragOver, setDragOver] = useState(false)
+  const [industryId, setIndustryId] = useState(INDUSTRIES[0].id)
+  const [serviceLine, setServiceLine] = useState('dining')
+  const [selectedDocIds, setSelectedDocIds] = useState([])
+  const [targets, setTargets] = useState({ scenarios: true, financial: false, qbr: false })
+
+  const industryTrainingTypes = TRAINING_TYPES[industryId] || []
+  const nonFacilitiesType = industryTrainingTypes.find(t => !t.id.startsWith('facilities-'))
+  const trainingType = serviceLine === 'dining' ? (nonFacilitiesType?.id || industryTrainingTypes[0]?.id) : serviceLine
+
+  const processedDocs = docs.filter(d => d.status === 'processed')
+  const totalDrafts = drafts.scenarios.length + drafts.moduleConfig.length
+
+  function handleFiles(fileList) {
+    const files = Array.from(fileList || [])
+    files.forEach(f => onUpload(f))
+  }
+
+  function toggleDoc(id) {
+    setSelectedDocIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function submitGenerate() {
+    const chosenTargets = Object.entries(targets).filter(([, v]) => v).map(([k]) => k)
+    if (!selectedDocIds.length) return
+    if (!chosenTargets.length) return
+    onGenerate({ documentIds: selectedDocIds, industryId, serviceLine, trainingType, targets: chosenTargets })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Upload */}
+      <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.gold, marginBottom: 4 }}>Your Organization's Policies & Procedures</div>
+        <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 14 }}>
+          Upload your own policy and procedure documents. The AI can generate training scenarios, rubric criteria, and Financial/QBR coaching content grounded in your organization's actual language — nothing generated here reaches trainees until you approve it below.
+        </div>
+
+        <label
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            border: `2px dashed ${dragOver ? C.communicateiqRed : '#D1D5DB'}`, borderRadius: 10,
+            padding: '28px 16px', cursor: 'pointer', background: dragOver ? '#FFF7F5' : '#FAFAFB',
+            marginBottom: 14, transition: 'background 0.15s, border-color 0.15s',
+          }}>
+          <div style={{ fontSize: 24, marginBottom: 6 }}>📄</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.gold, marginBottom: 2 }}>
+            {uploading ? 'Uploading…' : 'Drop a policy document here, or click to browse'}
+          </div>
+          <div style={{ fontSize: 12, color: '#9CA3AF' }}>PDF, Word (.docx), plain text, or markdown — up to 8MB</div>
+          <input
+            type="file" accept={ACCEPTED_EXT} multiple disabled={uploading}
+            onChange={e => { handleFiles(e.target.files); e.target.value = '' }}
+            style={{ display: 'none' }}
+          />
+        </label>
+
+        {docsLoading ? (
+          <div style={{ padding: 16, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading documents…</div>
+        ) : !docs.length ? (
+          <div style={{ padding: 16, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No policy documents uploaded yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {docs.map(d => (
+              <div key={d.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                background: '#F8F9FB', borderRadius: 8, fontSize: 13,
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_DOT[d.status] || '#9CA3AF', flexShrink: 0 }} />
+                <span style={{ flex: 1, color: '#374151', fontWeight: 600 }}>{fmtBytesFilename(d.filename)}</span>
+                <span style={{ color: d.status === 'error' ? C.red : '#9CA3AF', fontSize: 12 }}>
+                  {d.status === 'error' && d.error_message ? d.error_message : STATUS_TEXT[d.status]}
+                </span>
+                <button onClick={() => onDelete(d.id)}
+                  style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: 12, padding: 4 }}>
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Generate */}
+      <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.gold, marginBottom: 4 }}>Generate Content From Policies</div>
+        <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 14 }}>
+          Pick one or more processed documents, tell the AI which training track they apply to, and choose what to generate.
+        </div>
+
+        {!processedDocs.length ? (
+          <div style={{ fontSize: 13, color: '#9CA3AF', padding: '8px 0' }}>
+            Upload and wait for at least one document to finish processing before generating content.
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Source documents</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+              {processedDocs.map(d => (
+                <label key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={selectedDocIds.includes(d.id)} onChange={() => toggleDoc(d.id)} />
+                  {fmtBytesFilename(d.filename)}
+                </label>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Industry</div>
+                <select value={industryId} onChange={e => setIndustryId(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', fontSize: 13 }}>
+                  {INDUSTRIES.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Service line</div>
+                <select value={serviceLine} onChange={e => setServiceLine(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', fontSize: 13 }}>
+                  <option value="dining">{nonFacilitiesType?.label || 'Core Track'}</option>
+                  <option value="facilities-maintenance">Facilities — Maintenance</option>
+                  <option value="facilities-housekeeping">Facilities — Housekeeping</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Generate</div>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input type="checkbox" checked={targets.scenarios} onChange={e => setTargets(t => ({ ...t, scenarios: e.target.checked }))} />
+                Scenarios & Rubrics
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input type="checkbox" checked={targets.financial} onChange={e => setTargets(t => ({ ...t, financial: e.target.checked }))} />
+                Financial Storytelling
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input type="checkbox" checked={targets.qbr} onChange={e => setTargets(t => ({ ...t, qbr: e.target.checked }))} />
+                QBR Coaching
+              </label>
+            </div>
+
+            <button
+              onClick={submitGenerate}
+              disabled={generating || !selectedDocIds.length || !Object.values(targets).some(Boolean)}
+              style={{
+                background: C.communicateiqRed, color: '#fff', border: 'none', borderRadius: 8,
+                padding: '10px 20px', fontSize: 13, fontWeight: 700,
+                cursor: generating ? 'default' : 'pointer',
+                opacity: (generating || !selectedDocIds.length || !Object.values(targets).some(Boolean)) ? 0.5 : 1,
+              }}>
+              {generating ? 'Generating… (this can take a minute)' : 'Generate Draft Content'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Review drafts */}
+      <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.gold, marginBottom: 4 }}>Awaiting Review</div>
+        <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 14 }}>
+          {canReview
+            ? 'Nothing here reaches trainees until you approve it. Rejecting archives the draft.'
+            : 'A content_approver, org_admin, or corporate_admin needs to approve these before trainees see them.'}
+        </div>
+
+        {draftsLoading ? (
+          <div style={{ padding: 16, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading drafts…</div>
+        ) : !totalDrafts ? (
+          <div style={{ padding: 16, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No drafts waiting on review.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {drafts.scenarios.map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#F8F9FB', borderRadius: 8, fontSize: 13, opacity: draftBusyId === s.id ? 0.5 : 1 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#6B7280', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>SCENARIO</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#374151' }}>{s.title}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.industryId} · {s.trainingType} · {s.difficulty}</div>
+                </div>
+                {canReview && (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button disabled={draftBusyId === s.id} onClick={() => onReviewScenario(s.id, 'approve')}
+                      style={{ fontSize: 12, background: C.green, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                      Approve
+                    </button>
+                    <button disabled={draftBusyId === s.id} onClick={() => onReviewScenario(s.id, 'reject')}
+                      style={{ fontSize: 12, background: 'none', border: '1px solid #F0B8B8', color: C.red, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {drafts.moduleConfig.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#F8F9FB', borderRadius: 8, fontSize: 13, opacity: draftBusyId === c.id ? 0.5 : 1 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C2B5E', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>
+                  {c.module === 'financial' ? 'FINANCIAL' : 'QBR'}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#374151' }}>
+                    {c.module === 'financial' ? 'Financial Storytelling config' : 'QBR coaching config'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{c.industryId} · {c.serviceLine}</div>
+                </div>
+                {canReview && (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button disabled={draftBusyId === c.id} onClick={() => onReviewModuleConfig(c.id, 'approve')}
+                      style={{ fontSize: 12, background: C.green, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                      Approve
+                    </button>
+                    <button disabled={draftBusyId === c.id} onClick={() => onReviewModuleConfig(c.id, 'reject')}
+                      style={{ fontSize: 12, background: 'none', border: '1px solid #F0B8B8', color: C.red, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
