@@ -21,6 +21,22 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+// fetch() from a Netlify function that times out or crashes before returning
+// JSON hands back an HTML error page, not a JSON error body — res.json()
+// then throws its own confusing "Unexpected token '<'" instead of the real
+// problem. Parse defensively so the toast says something a person can act on.
+async function parseJsonResponse(res) {
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    if (res.status === 504 || res.status === 502) {
+      throw new Error('The server took too long to respond (this can happen with larger documents or more scenarios) — try again with fewer source documents or fewer content types at once.')
+    }
+    throw new Error(`Server returned an unexpected response (status ${res.status}). Try again in a moment.`)
+  }
+}
+
 export default function AdminConsole() {
   const { data: session, status } = useSession()
   const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
@@ -210,7 +226,7 @@ export default function AdminConsole() {
       const formData = new FormData()
       formData.append('file', file)
       const res = await fetch('/api/admin/policies', { method: 'POST', body: formData })
-      const data = await res.json()
+      const data = await parseJsonResponse(res)
       if (!res.ok) throw new Error(data.error || 'Upload failed')
       setToast({ type: 'success', text: `${file.name} uploaded.` })
       loadPolicyDocs()
@@ -241,7 +257,7 @@ export default function AdminConsole() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
-      const data = await res.json()
+      const data = await parseJsonResponse(res)
       if (!res.ok) throw new Error(data.error || 'Generation failed')
       const n = (data.results?.scenarios?.length || 0) + (data.results?.financial ? 1 : 0) + (data.results?.qbr ? 1 : 0)
       setToast({ type: 'success', text: `Generated ${n} draft item${n === 1 ? '' : 's'} — review below before it reaches trainees.` })
