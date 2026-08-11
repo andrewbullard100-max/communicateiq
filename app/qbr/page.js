@@ -408,14 +408,14 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
-          <span style={{ color: '#6B7280', fontSize: 12 }}>Day 4 · QBR Builder & Delivery</span>
+          <span style={{ color: '#6B7280', fontSize: 12 }}>QBR Builder & Delivery</span>
           {sectorLabel && (
             <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
               {sectorLabel}
             </span>
           )}
         </div>
-        <span className="label">Day 4 · QBR Excellence</span>
+        <span className="label">QBR Excellence</span>
         <h1 className="section-title fade-up" style={{ marginBottom: 8 }}>Build Your QBR</h1>
         <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 28, lineHeight: 1.7 }}>
           A QBR that drives strategic decisions looks fundamentally different from one that reports history.
@@ -529,7 +529,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
       <div style={{ background: '#F4F6F9', borderBottom: `1px solid ${C.navyLt}`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 12px' }} onClick={() => { stopRecording(); setStep('review') }}>← Exit</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10, color: '#1C2B5E', fontWeight: 700, letterSpacing: 1 }}>LIVE QBR DELIVERY · DAY 4</div>
+          <div style={{ fontSize: 10, color: '#1C2B5E', fontWeight: 700, letterSpacing: 1 }}>LIVE QBR DELIVERY</div>
           <div style={{ fontSize: 13, fontWeight: 600 }}>{account || 'QBR'} — Presenting to {selectedPersona.label}</div>
         </div>
         <div style={{
@@ -638,7 +638,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
     return (
       <div style={{ minHeight: '100vh', background: '#F4F6F9' }}>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '36px 24px' }}>
-          <span className="label fade-up">Day 4 · QBR Delivery Assessment</span>
+          <span className="label fade-up">QBR Delivery Assessment</span>
           <h1 className="section-title fade-up" style={{ marginBottom: 24 }}>QBR Delivery Results</h1>
           <div className="card fade-up-1" style={{ border: '2px solid #1C2B5E', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>

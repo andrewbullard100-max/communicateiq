@@ -135,7 +135,7 @@ Keep total under 300 words.`
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
-          <span style={{ color: '#6B7280', fontSize: 12 }}>Day 2 · Financial Storytelling</span>
+          <span style={{ color: '#6B7280', fontSize: 12 }}>Financial Storytelling</span>
           {sectorLabel && (
             <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
               {sectorLabel}
@@ -143,7 +143,7 @@ Keep total under 300 words.`
           )}
         </div>
 
-        <span className="label">Day 2 · Financial Storytelling & Contract Intelligence</span>
+        <span className="label">Financial Storytelling & Contract Intelligence</span>
         <h1 className="section-title fade-up" style={{ marginBottom: 8 }}>Translate Your P&L Into Client Language</h1>
         <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 28, lineHeight: 1.7 }}>
           The {cfg.decisionMakerTitle} doesn't speak "board days" or "managed forecast." Every number you show them must land in terms they care about. Enter your real numbers, write your translations, and get AI coaching on how a {cfg.decisionMakerTitle} would actually hear them.

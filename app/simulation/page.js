@@ -419,7 +419,7 @@ useEffect(() => {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>Back to Platform</Link>
-          <span style={{ color: '#6B7280', fontSize: 12 }}>Days 1-3 · Role-Play Simulations</span>
+          <span style={{ color: '#6B7280', fontSize: 12 }}>Role-Play Simulations</span>
         </div>
         <span className="label">{industry ? `${industry.label}${trainingType ? ' · ' + trainingType.label : ''}` : 'Live AI Simulations'}</span>
         <h1 className="section-title fade-up" style={{ marginBottom: 4 }}>Role-Play Scenarios</h1>

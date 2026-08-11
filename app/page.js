@@ -142,7 +142,7 @@ export default function Home() {
             On-demand leadership communication training — ready when you are. Practice the exact conversations that define your career: executive escalations, client financial reviews, service recovery, and stakeholder management. No scheduled bootcamp required. Train when the moment calls for it, scored in real time against a five-dimension certification rubric.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {[['5','Rubric Dimensions'],['4','Live Simulations'],['45-Day','Cert Window'],['80%+','Required to Certify'],['AI-Scored','Field Assessment']].map(([val, lbl]) => (
+            {[['5','Rubric Dimensions'],['4','Live Simulations'],['Self-Paced','Certification Track'],['80%+','Required to Certify'],['AI-Scored','Field Assessment']].map(([val, lbl]) => (
               <div key={lbl} style={{ textAlign: 'center', padding: '14px 20px', background: '#FFFFFF', border: '1.5px solid #D1D5DB', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', minWidth: 110 }}>
                 <div style={{ fontSize: 22, fontWeight: 900, color: '#1C2B5E', fontFamily: 'monospace', marginBottom: 3 }}>{val}</div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>{lbl}</div>
@@ -188,7 +188,7 @@ export default function Home() {
         </div>
 
         <div style={{ background: '#FFFFFF', border: '1.5px solid #D1D5DB', borderLeft: '4px solid #1C2B5E', borderRadius: 8, padding: '14px 20px', fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
-          <strong style={{ color: '#1C2B5E' }}>Certification path:</strong> Complete the Diagnostic → build your Stakeholder Map → complete Role-Play Simulations → master Financial Storytelling → deliver your QBR. Full certification requires 80%+ on the AI-scored Day 45 field assessment plus District Manager validation.
+          <strong style={{ color: '#1C2B5E' }}>Certification path:</strong> Complete the Diagnostic → build your Stakeholder Map → complete Role-Play Simulations → master Financial Storytelling → deliver your QBR. Full certification requires 80%+ on the AI-scored field assessment plus District Manager validation.
         </div>
       </div>
     </div>

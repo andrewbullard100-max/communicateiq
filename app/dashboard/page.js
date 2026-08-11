@@ -38,7 +38,6 @@ export default function DashboardPage() {
   }, [])
 
   const completedTasks = FIELD_TASKS.filter(t => checklist[t.id]).length
-  const daysSince = 0 // Would be calculated from actual training date in production
   const certProgress = Math.round((completedTasks / FIELD_TASKS.length) * 100)
 
   function toggleTask(id) { setChecklist(c => ({ ...c, [id]: !c[id] })) }
@@ -46,7 +45,7 @@ export default function DashboardPage() {
   async function scoreWrittenResponse() {
     if (!writtenResponse.trim()) return
     setLoading(true)
-    const system = `You are an AI certification assessor for CommunicateIQ's Executive Communication Training Program conducting the Day 45 field assessment.
+    const system = `You are an AI certification assessor for CommunicateIQ's Executive Communication Training Program conducting the field certification assessment.
 This is the official written scenario component of the full certification assessment.
 Score using the five-dimension rubric: Clarity, Data Discipline, Ownership, Executive Tone, Forward Commitment (each 1-4).
 Also assess: Multi-stakeholder navigation, Framework integration, Decision clarity.
@@ -82,10 +81,10 @@ Keep under 400 words. Be direct and specific.`
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
-          <span style={{ color: '#6B7280', fontSize: 12 }}>45-Day Certification Dashboard</span>
+          <span style={{ color: '#6B7280', fontSize: 12 }}>Certification Dashboard</span>
         </div>
 
-        <span className="label">45-Day Certification Window</span>
+        <span className="label">Certification Progress</span>
         <h1 className="section-title fade-up" style={{ marginBottom: 20 }}>Certification Dashboard</h1>
 
         {/* Tabs */}
@@ -108,8 +107,8 @@ Keep under 400 words. Be direct and specific.`
                   </div>
                 </div>
                 <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'monospace', color: '#1C2B5E' }}>Day {daysSince || 1}</div>
-                  <div style={{ fontSize: 11, color: '#6B7280' }}>of 45-day window</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'monospace', color: '#1C2B5E' }}>{certProgress}%</div>
+                  <div style={{ fontSize: 11, color: '#6B7280' }}>field tasks complete</div>
                 </div>
               </div>
             </div>
@@ -187,9 +186,9 @@ Keep under 400 words. Be direct and specific.`
         {activeTab === 'field' && (
           <div>
             <div className="card fade-up" style={{ marginBottom: 16, background: 'rgba(28,43,94,0.04)', borderColor: '#1C2B5E' }}>
-              <span className="label">30-Day Field Commitment</span>
+              <span className="label">Field Commitment</span>
               <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7 }}>
-                These tasks must be completed in your real account during the 45-day window. Submit your completion checklist to your District Manager. The AI certification assessment opens once all tasks are checked.
+                These tasks must be completed in your real account. Submit your completion checklist to your District Manager. The AI certification assessment opens once all tasks are checked.
               </p>
             </div>
             <div style={{ display: 'grid', gap: 12 }}>
@@ -217,7 +216,7 @@ Keep under 400 words. Be direct and specific.`
             </div>
             <div style={{ marginTop: 20, padding: '14px 18px', background: `rgba(55,86,35,0.15)`, border: `1px solid ${C.green}`, borderRadius: 8, fontSize: 13, color: '#374151' }}>
               <strong style={{ color: C.greenLt }}>{completedTasks}/{FIELD_TASKS.length} tasks complete.</strong>
-              {completedTasks >= FIELD_TASKS.length ? ' You are ready for the certification assessment.' : ` Complete all ${FIELD_TASKS.length} tasks before scheduling your Day 45 assessment.`}
+              {completedTasks >= FIELD_TASKS.length ? ' You are ready for the certification assessment.' : ` Complete all ${FIELD_TASKS.length} tasks before scheduling your certification assessment.`}
             </div>
           </div>
         )}
@@ -226,7 +225,7 @@ Keep under 400 words. Be direct and specific.`
         {activeTab === 'assessment' && (
           <div>
             <div className="card fade-up" style={{ marginBottom: 16 }}>
-              <span className="label">Day 45 — AI Certification Assessment</span>
+              <span className="label">AI Certification Assessment</span>
               <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 14 }}>
                 The certification assessment has three components, each scored separately. You must achieve 80%+ overall with no critical failure dimensions. Complete in a single session without preparation time.
               </p>
@@ -257,7 +256,7 @@ Keep under 400 words. Be direct and specific.`
 
             {certSection === 'written' && (
               <div className="card fade-up">
-                <span className="label">Written Scenario — Day 45 Assessment</span>
+                <span className="label">Written Scenario — Certification Assessment</span>
                 <div style={{ background: 'rgba(28,43,94,0.06)', border: `1px solid ${C.goldDim}`, borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
                   <div style={{ fontSize: 11, color: '#1C2B5E', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>SCENARIO</div>
                   <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.7 }}>{WRITTEN_SCENARIO}</div>
@@ -305,7 +304,7 @@ Keep under 400 words. Be direct and specific.`
         {activeTab === 'dm' && (
           <div>
             <div className="card fade-up" style={{ marginBottom: 16 }}>
-              <span className="label">District Manager Validation — Days 46–50</span>
+              <span className="label">District Manager Validation</span>
               <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 14 }}>
                 After the AI assessment, your District Manager reviews results, observed meeting notes, and submitted field work. DM sign-off is required for full certification. Use this section to document observations and prepare for the validation conversation.
               </p>
@@ -318,7 +317,7 @@ Keep under 400 words. Be direct and specific.`
                 onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.navyLt} />
             </div>
             <div className="card fade-up-2" style={{ marginBottom: 16 }}>
-              <span className="label">90-Day Development Plan Notes</span>
+              <span className="label">Development Plan Notes</span>
               <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 12 }}>Identify the 1-2 dimensions that need continued focus based on AI scores and field observations.</p>
               <textarea value={dmNotes} onChange={e => setDmNotes(e.target.value)} rows={4} placeholder="e.g. AI scores show Data Discipline as the persistent gap — participant understands the framework but reverts to operational language under pressure. Focus for Q3: one CFO conversation with DM present per period..."
                 style={{ width: '100%', background: '#F4F6F9', border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '12px 14px', color: '#1C2B5E', fontSize: 14, fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}

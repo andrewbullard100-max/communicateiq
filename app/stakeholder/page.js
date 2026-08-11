@@ -108,7 +108,7 @@ Review this stakeholder map and provide coaching feedback.`
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
-          <span style={{ color: '#6B7280', fontSize: 12 }}>Day 1 · Stakeholder Mapping</span>
+          <span style={{ color: '#6B7280', fontSize: 12 }}>Stakeholder Mapping</span>
           {sectorLabel && (
             <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
               {sectorLabel}
@@ -117,7 +117,7 @@ Review this stakeholder map and provide coaching feedback.`
         </div>
 
         <div className="fade-up">
-          <span className="label">Day 1 · Stakeholder Mastery</span>
+          <span className="label">Stakeholder Mastery</span>
           <h1 className="section-title">Build Your Account Map</h1>
           <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 24, lineHeight: 1.7 }}>
             The most dangerous assumption in this business is that the people who matter are the people on your meeting calendar.
