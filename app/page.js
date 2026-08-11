@@ -14,10 +14,12 @@ export default function Home() {
   const TEAM_VIEW_ROLES = ['manager', 'org_admin', 'corporate_admin']
   const ADMIN_CONSOLE_ROLES = ['org_admin', 'corporate_admin']
   const REVIEWER_ROLES = ['content_approver', 'org_admin', 'corporate_admin']
+  const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
   const modules = MODULES.filter(m => {
     if (m.orgAdminOnly) return ADMIN_CONSOLE_ROLES.includes(session?.user?.role)
     if (m.reviewerOnly) return REVIEWER_ROLES.includes(session?.user?.role)
     if (m.adminOnly) return TEAM_VIEW_ROLES.includes(session?.user?.role)
+    if (m.contentRoleOnly) return CONTENT_ROLES.includes(session?.user?.role)
     return true
   })
 
@@ -160,21 +162,22 @@ export default function Home() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14, marginBottom: 40 }}>
           {modules.map((mod, i) => {
-            const isStart = mod.id === 'diagnostic'
+            const badge = mod.badge
+            const isHighlighted = Boolean(badge)
             return (
               <Link key={mod.id} href={mod.href} style={{ textDecoration: 'none' }}>
                 <div
                   className={`fade-up-${Math.min(i+1, 5)}`}
-                  style={{ background: '#FFFFFF', border: `1.5px solid ${isStart ? '#1C2B5E' : '#D1D5DB'}`, borderRadius: 10, padding: '18px 20px', boxShadow: isStart ? '0 2px 12px rgba(28,43,94,0.12)' : '0 1px 4px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#1C2B5E'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(28,43,94,0.12)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = isStart ? '#1C2B5E' : '#D1D5DB'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isStart ? '0 2px 12px rgba(28,43,94,0.12)' : '0 1px 4px rgba(0,0,0,0.05)' }}
+                  style={{ background: '#FFFFFF', border: `1.5px solid ${isHighlighted ? badge.bg : '#D1D5DB'}`, borderRadius: 10, padding: '18px 20px', boxShadow: isHighlighted ? `0 2px 12px ${badge.bg}1F` : '0 1px 4px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = badge?.bg || '#1C2B5E'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(28,43,94,0.12)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = isHighlighted ? badge.bg : '#D1D5DB'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isHighlighted ? `0 2px 12px ${badge.bg}1F` : '0 1px 4px rgba(0,0,0,0.05)' }}
                 >
                   <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: '#F4F6F9', border: '1.5px solid #D1D5DB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{mod.icon}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 5 }}>
                         <span style={{ fontSize: 10, color: '#1C2B5E', fontWeight: 700, letterSpacing: 1 }}>{mod.day}</span>
-                        {isStart && <span style={{ fontSize: 10, background: '#1C2B5E', color: '#FFFFFF', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>START HERE</span>}
+                        {badge && <span style={{ fontSize: 10, background: badge.bg, color: '#FFFFFF', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>{badge.text}</span>}
                       </div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#1C2B5E', marginBottom: 4 }}>{mod.label}</div>
                       <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>{mod.desc}</div>

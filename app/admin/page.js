@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { C, INDUSTRIES, TRAINING_TYPES } from '../../lib/data'
 
@@ -37,13 +38,18 @@ async function parseJsonResponse(res) {
   }
 }
 
-export default function AdminConsole() {
+// useSearchParams (used to support the /admin?tab=policies deep link from
+// the home page's "Upload Your Policies" tile) requires a Suspense boundary
+// around anything that calls it, or Next.js bails out of prerendering the
+// route entirely — see the export default wrapper at the bottom of this file.
+function AdminConsole() {
   const { data: session, status } = useSession()
   const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
   const REVIEWER_ROLES_CLIENT = ['content_approver', 'org_admin', 'corporate_admin']
   const canManagePolicies = CONTENT_ROLES.includes(session?.user?.role)
   const canReviewPolicies = REVIEWER_ROLES_CLIENT.includes(session?.user?.role)
   const isOrgAdmin = ['org_admin', 'corporate_admin'].includes(session?.user?.role)
+  const searchParams = useSearchParams()
   const [tab, setTab] = useState('users')
   const [users, setUsers] = useState([])
   const [events, setEvents] = useState([])
@@ -85,6 +91,11 @@ export default function AdminConsole() {
 
   useEffect(() => {
     if (status !== 'authenticated' || loading) return
+    // A direct link (e.g. the "Upload Your Policies" tile on the home page,
+    // which points to /admin?tab=policies) always wins over the role-based
+    // default — someone clicked something specific, don't second-guess it.
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab === 'policies' && canManagePolicies) { setTab('policies'); return }
     if (!isOrgAdmin && canManagePolicies) setTab('policies')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, loading])
@@ -1068,5 +1079,13 @@ function PoliciesPanel({
         )}
       </div>
     </div>
+  )
+}
+
+export default function AdminConsolePage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.gray }}>Loading…</div>}>
+      <AdminConsole />
+    </Suspense>
   )
 }
