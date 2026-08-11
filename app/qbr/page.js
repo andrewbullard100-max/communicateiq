@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { C, callAI, getSelectedIndustryId, getIndustryConfig } from '../../lib/data'
+import { C, callAI, getSelectedIndustryId, getSelectedServiceLine, getIndustryConfig, applyOrgConfig, TRAINING_TYPES } from '../../lib/data'
 
 const SILENCE_MS = 5000
 
@@ -12,7 +12,7 @@ const SILENCE_MS = 5000
 // simulation_attempts.ai_scores stores fine since it's jsonb — the review
 // UI renders whatever dimension keys are present rather than assuming
 // the role-play module's five.
-function persistQbrResult(industryId, deliveryResult, transcript) {
+function persistQbrResult(industryId, deliveryResult, transcript, serviceLine) {
   if (!deliveryResult) return
   const { headline, boardReadiness, strongestMoment, criticalGap, ...scores } = deliveryResult
   fetch('/api/results', {
@@ -22,7 +22,7 @@ function persistQbrResult(industryId, deliveryResult, transcript) {
       scenarioId: 'qbr-delivery',
       scenarioTitle: 'QBR Delivery',
       industry: industryId,
-      trainingType: 'qbr',
+      trainingType: serviceLine || 'qbr',
       scores,
       certificationStatus: boardReadiness,
       headline,
@@ -33,8 +33,24 @@ function persistQbrResult(industryId, deliveryResult, transcript) {
 
 export default function QBRPage() {
   const [industryId, setIndustryId] = useState('higher-ed')
-  useEffect(() => { setIndustryId(getSelectedIndustryId()) }, [])
-  const cfg = getIndustryConfig(industryId)
+  const [serviceLine, setServiceLine] = useState(null)
+  const [orgConfig, setOrgConfig] = useState(null)
+  useEffect(() => {
+    setIndustryId(getSelectedIndustryId())
+    setServiceLine(getSelectedServiceLine())
+  }, [])
+  // An org's own approved custom QBR content (generated from their uploaded
+  // policies, see /admin → Policies) overrides the base sections/personas
+  // once it resolves. No-op for orgs with nothing generated/approved yet.
+  useEffect(() => {
+    if (!industryId) return
+    fetch(`/api/org-config?module=qbr&industryId=${industryId}&serviceLine=${serviceLine || 'dining'}`)
+      .then(res => res.json())
+      .then(data => setOrgConfig(data.config || null))
+      .catch(() => setOrgConfig(null))
+  }, [industryId, serviceLine])
+  const cfg = applyOrgConfig(getIndustryConfig(industryId, serviceLine), orgConfig)
+  const sectorLabel = (TRAINING_TYPES[industryId] || []).find(t => t.id === (serviceLine || ''))?.label
   const QBR_SECTIONS = cfg.qbrSections
   const BOARDROOM_PERSONAS = cfg.qbrPersonas
 
@@ -44,12 +60,13 @@ export default function QBRPage() {
   const [step, setStep] = useState('build')
   const [selectedPersona, setSelectedPersona] = useState(BOARDROOM_PERSONAS[0])
   // Re-seed section defaults and the selected persona once the real
-  // industry resolves post-mount (initial render uses higher-ed).
+  // industry/service line/org override resolves post-mount (initial render
+  // uses higher-ed dining).
   useEffect(() => {
     setSections(Object.fromEntries(QBR_SECTIONS.map(s => [s.id, s.defaultValue || ''])))
     setSelectedPersona(BOARDROOM_PERSONAS[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [industryId])
+  }, [industryId, serviceLine, orgConfig])
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -195,7 +212,7 @@ export default function QBRPage() {
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
           setDeliveryResult(parsed)
-          persistQbrResult(industryId, parsed, newMsgs)
+          persistQbrResult(industryId, parsed, newMsgs, serviceLine)
           setStep('results')
         } catch { setMessages(prev => [...prev, { role: 'assistant', content: text }]) }
       } else {
@@ -216,7 +233,10 @@ export default function QBRPage() {
     setLoading(true)
     setStep('review')
     const content = QBR_SECTIONS.map(s => `## ${s.label}\n${sections[s.id] || '(not completed)'}`).join('\n\n')
-    const system = `You are a master facilitator reviewing a foodservice GM's QBR structure before they present to a client executive board.
+    const sectorNoun = serviceLine === 'facilities-maintenance' ? 'facilities maintenance'
+      : serviceLine === 'facilities-housekeeping' ? 'housekeeping/environmental services'
+      : 'foodservice'
+    const system = `You are a master facilitator reviewing a ${sectorNoun} GM's QBR structure before they present to a client executive board.
 Evaluate the QBR for: executive framing (does it lead with decisions or with history?), financial storytelling quality, the client-experience narrative, strategic forward-focus, and decision clarity.
 Format with these headers:
 ## Overall Structure Assessment
@@ -238,7 +258,10 @@ Keep total under 400 words. Be specific.`
 
   function buildDeliverySystem() {
     const qbrContent = QBR_SECTIONS.map(s => `${s.label}: ${sections[s.id] || '(not completed)'}`).join('\n')
-    return `You are playing the role of ${selectedPersona.label} in a QBR presentation for ${account || 'a foodservice client account'}.
+    const accountNoun = serviceLine === 'facilities-maintenance' ? 'a facilities maintenance client account'
+      : serviceLine === 'facilities-housekeeping' ? 'a housekeeping client account'
+      : 'a foodservice client account'
+    return `You are playing the role of ${selectedPersona.label} in a QBR presentation for ${account || accountNoun}.
 
 PERSONA: ${selectedPersona.style}
 
@@ -326,7 +349,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
           setDeliveryResult(parsed)
-          persistQbrResult(industryId, parsed, newMsgs)
+          persistQbrResult(industryId, parsed, newMsgs, serviceLine)
           setStep('results')
         } catch { setMessages(prev => [...prev, { role: 'assistant', content: text }]) }
       } else {
@@ -353,7 +376,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
           setDeliveryResult(parsed)
-          persistQbrResult(industryId, parsed, apiMsgs)
+          persistQbrResult(industryId, parsed, apiMsgs, serviceLine)
           setStep('results')
         } catch {}
       } else {
@@ -367,7 +390,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
             const clean = retry.slice(retry.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
             const parsed = JSON.parse(clean)
             setDeliveryResult(parsed)
-            persistQbrResult(industryId, parsed, apiMsgs)
+            persistQbrResult(industryId, parsed, apiMsgs, serviceLine)
             setStep('results')
           } catch {}
         }
@@ -383,9 +406,14 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
   if (step === 'build') return (
     <div style={{ minHeight: '100vh', background: '#F4F6F9' }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '36px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
           <span style={{ color: '#6B7280', fontSize: 12 }}>Day 4 · QBR Builder & Delivery</span>
+          {sectorLabel && (
+            <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
+              {sectorLabel}
+            </span>
+          )}
         </div>
         <span className="label">Day 4 · QBR Excellence</span>
         <h1 className="section-title fade-up" style={{ marginBottom: 8 }}>Build Your QBR</h1>

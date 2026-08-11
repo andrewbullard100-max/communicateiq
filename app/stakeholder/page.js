@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { C, callAI, getSelectedIndustryId, getIndustryConfig } from '../../lib/data'
+import { C, callAI, getSelectedIndustryId, getSelectedServiceLine, getIndustryConfig, TRAINING_TYPES } from '../../lib/data'
 
 const emptyContact = () => ({
   name: '', title: '', cares: '', relationship: '', lastContact: '', influence: '',
@@ -9,19 +9,24 @@ const emptyContact = () => ({
 
 export default function StakeholderPage() {
   const [industryId, setIndustryId] = useState('higher-ed')
-  useEffect(() => { setIndustryId(getSelectedIndustryId()) }, [])
-  const cfg = getIndustryConfig(industryId)
+  const [serviceLine, setServiceLine] = useState(null)
+  useEffect(() => {
+    setIndustryId(getSelectedIndustryId())
+    setServiceLine(getSelectedServiceLine())
+  }, [])
+  const cfg = getIndustryConfig(industryId, serviceLine)
+  const sectorLabel = (TRAINING_TYPES[industryId] || []).find(t => t.id === (serviceLine || ''))?.label
 
   const [account, setAccount] = useState('')
   const [formal, setFormal] = useState(
     cfg.stakeholderRoles.map(r => ({ ...r, name: '', relationship: '3', lastContact: '' }))
   )
-  // Rebuild the formal-role rows whenever the industry resolves (post-mount)
-  // so the table isn't stuck on the higher-ed default set.
+  // Rebuild the formal-role rows whenever the industry or service line resolves
+  // (post-mount) so the table isn't stuck on the higher-ed dining default set.
   useEffect(() => {
     setFormal(cfg.stakeholderRoles.map(r => ({ ...r, name: '', relationship: '3', lastContact: '' })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [industryId])
+  }, [industryId, serviceLine])
   const [informal, setInformal] = useState([emptyContact(), emptyContact(), emptyContact()])
   const [riskRelationship, setRiskRelationship] = useState('')
   const [riskAction, setRiskAction] = useState('')
@@ -42,7 +47,7 @@ export default function StakeholderPage() {
 
   async function getAIReview() {
 try {
-  const stakeholderMap = { account, industry: industryId }
+  const stakeholderMap = { account, industry: industryId, serviceLine: serviceLine || 'dining' }
   formal.forEach(f => {
     if (!f.name.trim() || !f.key) return
     stakeholderMap[f.key] = f.name.trim()
@@ -101,9 +106,14 @@ Review this stakeholder map and provide coaching feedback.`
     <div style={{ minHeight: '100vh', background: '#F4F6F9' }}>
       <div style={{ maxWidth: 920, margin: '0 auto', padding: '36px 24px' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
           <span style={{ color: '#6B7280', fontSize: 12 }}>Day 1 · Stakeholder Mapping</span>
+          {sectorLabel && (
+            <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
+              {sectorLabel}
+            </span>
+          )}
         </div>
 
         <div className="fade-up">

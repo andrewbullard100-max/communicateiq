@@ -1,12 +1,17 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { C, callAI, getSelectedIndustryId, getIndustryConfig } from '../../lib/data'
+import { C, callAI, getSelectedIndustryId, getSelectedServiceLine, getIndustryConfig, TRAINING_TYPES } from '../../lib/data'
 
 export default function DiagnosticPage() {
   const [industryId, setIndustryId] = useState('higher-ed')
-  useEffect(() => { setIndustryId(getSelectedIndustryId()) }, [])
-  const cfg = getIndustryConfig(industryId)
+  const [serviceLine, setServiceLine] = useState(null)
+  useEffect(() => {
+    setIndustryId(getSelectedIndustryId())
+    setServiceLine(getSelectedServiceLine())
+  }, [])
+  const cfg = getIndustryConfig(industryId, serviceLine)
+  const sectorLabel = (TRAINING_TYPES[industryId] || []).find(t => t.id === (serviceLine || ''))?.label
   const DIAGNOSTIC_QUESTIONS = cfg.diagnosticQuestions
 
   const [scores, setScores] = useState({})
@@ -64,9 +69,14 @@ Provide a personalized learning plan based on these results.`
       <div style={{ maxWidth: 780, margin: '0 auto', padding: '36px 24px' }}>
 
         {/* Nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
           <span style={{ color: '#6B7280', fontSize: 12 }}>Pre-Course Diagnostic</span>
+          {sectorLabel && (
+            <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
+              {sectorLabel}
+            </span>
+          )}
         </div>
 
         {!submitted ? (
@@ -141,7 +151,13 @@ Provide a personalized learning plan based on these results.`
               <textarea
                 value={avoidedConversation}
                 onChange={e => setAvoidedConversation(e.target.value)}
-                placeholder={`e.g. I need to tell the ${cfg.decisionMakerTitle} that our food cost will exceed budget this quarter because of protein costs, but I haven't found the right framing yet...`}
+                placeholder={
+                  serviceLine === 'facilities-maintenance'
+                    ? `e.g. I need to tell the ${cfg.decisionMakerTitle} that our capital request will exceed budget this quarter because of aging HVAC equipment, but I haven't found the right framing yet...`
+                    : serviceLine === 'facilities-housekeeping'
+                      ? `e.g. I need to tell the ${cfg.decisionMakerTitle} why our inspection score dropped this quarter, but I haven't found the right framing yet...`
+                      : `e.g. I need to tell the ${cfg.decisionMakerTitle} that our food cost will exceed budget this quarter because of protein costs, but I haven't found the right framing yet...`
+                }
                 rows={4}
                 style={{
                   width: '100%', background: '#F4F6F9', border: '1.5px solid #D1D5DB',

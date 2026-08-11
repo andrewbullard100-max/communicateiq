@@ -1,12 +1,31 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { C, callAI, getSelectedIndustryId, getIndustryConfig } from '../../lib/data'
+import { C, callAI, getSelectedIndustryId, getSelectedServiceLine, getIndustryConfig, applyOrgConfig, TRAINING_TYPES } from '../../lib/data'
 
 export default function FinancialPage() {
   const [industryId, setIndustryId] = useState('higher-ed')
-  useEffect(() => { setIndustryId(getSelectedIndustryId()) }, [])
-  const cfg = getIndustryConfig(industryId)
+  const [serviceLine, setServiceLine] = useState(null)
+  const [orgConfig, setOrgConfig] = useState(null)
+  const [orgConfigLoaded, setOrgConfigLoaded] = useState(false)
+  useEffect(() => {
+    setIndustryId(getSelectedIndustryId())
+    setServiceLine(getSelectedServiceLine())
+  }, [])
+  // An org's own approved custom Financial Storytelling content (generated
+  // from their uploaded policies, see /admin → Policies) overrides the base
+  // metrics/challenges once it resolves. Silent no-op for orgs that haven't
+  // generated/approved anything — applyOrgConfig(cfg, null) just returns cfg.
+  useEffect(() => {
+    if (!industryId) return
+    fetch(`/api/org-config?module=financial&industryId=${industryId}&serviceLine=${serviceLine || 'dining'}`)
+      .then(res => res.json())
+      .then(data => setOrgConfig(data.config || null))
+      .catch(() => setOrgConfig(null))
+      .finally(() => setOrgConfigLoaded(true))
+  }, [industryId, serviceLine])
+  const cfg = applyOrgConfig(getIndustryConfig(industryId, serviceLine), orgConfig)
+  const sectorLabel = (TRAINING_TYPES[industryId] || []).find(t => t.id === (serviceLine || ''))?.label
   const METRICS = cfg.financialMetrics
   const CFO_CHALLENGES = cfg.financialChallenges
 
@@ -20,7 +39,7 @@ export default function FinancialPage() {
     setTranslations(Object.fromEntries(METRICS.map(m => [m.id, m.defaultTranslation || ''])))
     setChallenge(CFO_CHALLENGES[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [industryId])
+  }, [industryId, serviceLine, orgConfig])
   const [challengeResponse, setChallengeResponse] = useState('')
   const [loading, setLoading] = useState(false)
   const [coachingTab, setCoachingTab] = useState(null)
@@ -41,15 +60,21 @@ export default function FinancialPage() {
       `METRIC: ${m.label} = ${metrics[m.id]}\nINTERNAL MEANING: ${m.internal}\nGM'S CLIENT TRANSLATION: "${translations[m.id]}"`
     ).join('\n\n')
 
-    const system = `You are a master facilitator coaching a foodservice GM on financial storytelling for a client ${cfg.decisionMakerTitle}.
+    const sectorNoun = serviceLine === 'facilities-maintenance' ? 'facilities maintenance'
+      : serviceLine === 'facilities-housekeeping' ? 'housekeeping/environmental services'
+      : 'foodservice'
+    const exampleMetric = serviceLine === 'facilities-maintenance' ? 'PM compliance moving from 96% to 91% is down 5 percentage points'
+      : serviceLine === 'facilities-housekeeping' ? 'inspection score moving from 93% to 88% is down 5 percentage points'
+      : 'food cost moving from 34% to 38% is up 4 percentage points'
+    const system = `You are a master facilitator coaching a ${sectorNoun} GM on financial storytelling for a client ${cfg.decisionMakerTitle}.
 
 CRITICAL TERMINOLOGY RULES — flag violations in your feedback:
-- "Percentage points" (or "points") = the arithmetic difference between two percentages. Example: food cost moving from 34% to 38% is up 4 percentage points (NOT "4 percent").
+- "Percentage points" (or "points") = the arithmetic difference between two percentages. Example: ${exampleMetric} (NOT the equivalent "percent" phrasing).
 - "Percent" = a relative change. Example: revenue growing from $800K to $848K is up 6 percent.
-- "Basis points" = used in finance/investment contexts. 100 basis points = 1 percentage point. Do NOT use basis points in dining operations — say "percentage points" or "points" instead.
-- NEVER say "food cost is up 4%" when you mean "food cost is up 4 percentage points." These mean completely different things to a CFO.
-- Meal plan participation changes should be stated in "percentage points" not "percent."
-- Revenue changes should be stated as "percent" (relative change).
+- "Basis points" = used in finance/investment contexts. 100 basis points = 1 percentage point. Do NOT use basis points in ${sectorNoun} operations — say "percentage points" or "points" instead.
+- NEVER state a rate metric as "up 4%" when it should be "up 4 percentage points." These mean completely different things to a ${cfg.decisionMakerTitle}.
+- Rate/score metrics (PM compliance, inspection scores, meal plan participation) should be stated in "percentage points" not "percent."
+- Revenue and cost-line changes should be stated as "percent" (relative change).
 
 Review each metric translation and give specific, direct feedback. Rate each as Weak/Developing/Proficient/Distinguished.
 Flag any terminology errors prominently.
@@ -76,9 +101,9 @@ A GM just responded to a CFO challenge. Evaluate their response using the five-d
 Clarity, Data Discipline, Ownership, Executive Tone, Forward Commitment (each 1-4).
 
 TERMINOLOGY — flag any violations:
-- "Points" or "percentage points" = difference between two percentages (food cost, labor %, participation rates)
+- "Points" or "percentage points" = difference between two percentages (${serviceLine ? 'PM compliance/inspection scores, labor %, backlog/turnover rates' : 'food cost, labor %, participation rates'})
 - "Percent" = relative change (revenue growth, cost increases)
-- Never use "basis points" in a dining operations context
+- Never use "basis points" in a ${serviceLine ? 'facilities' : 'dining'} operations context
 - Never say "up X%" when describing a change in a percentage metric — say "up X points" or "up X percentage points"
 
 Format exactly:
@@ -108,9 +133,14 @@ Keep total under 300 words.`
     <div style={{ minHeight: '100vh', background: '#F4F6F9' }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '36px 24px' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
           <span style={{ color: '#6B7280', fontSize: 12 }}>Day 2 · Financial Storytelling</span>
+          {sectorLabel && (
+            <span style={{ background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4 }}>
+              {sectorLabel}
+            </span>
+          )}
         </div>
 
         <span className="label">Day 2 · Financial Storytelling & Contract Intelligence</span>
@@ -123,27 +153,45 @@ Keep total under 300 words.`
         <div className="card fade-up-1" style={{ marginBottom: 16, borderLeft: '4px solid #1C2B5E', background: '#FFFFFF' }}>
           <span className="label" style={{ color: '#1C2B5E' }}>Terminology Reference — Know Before You Present</span>
           <p style={{ fontSize: 13, color: '#374151', marginBottom: 14, lineHeight: 1.7 }}>
-            Using the wrong term signals to a CFO that you don't understand your own numbers. Here's the rule:
+            Using the wrong term signals to a {cfg.decisionMakerTitle} that you don't understand your own numbers. Here's the rule:
           </p>
           <div style={{ display: 'grid', gap: 10 }}>
             {[
               {
                 term: 'Percentage Points (or "Points")',
                 rule: 'Use when describing the arithmetic difference between two percentages.',
-                right: 'Food cost moved from 34.2% to 38.6% — up 4.4 percentage points.',
-                wrong: '"Food cost is up 4.4 percent." (This implies a relative increase of 4.4%, which would mean a much smaller move.)',
-                applies: 'Food cost %, labor %, participation/utilization rate, satisfaction scores',
+                right: serviceLine === 'facilities-maintenance'
+                  ? 'PM compliance moved from 96% to 91% — down 5 percentage points.'
+                  : serviceLine === 'facilities-housekeeping'
+                    ? 'Inspection score moved from 93% to 88% — down 5 percentage points.'
+                    : 'Food cost moved from 34.2% to 38.6% — up 4.4 percentage points.',
+                wrong: serviceLine === 'facilities-maintenance'
+                  ? '"PM compliance is down 5 percent." (This implies a relative drop of 5%, which would mean a much smaller move.)'
+                  : serviceLine === 'facilities-housekeeping'
+                    ? '"Inspection score is down 5 percent." (This implies a relative drop of 5%, which would mean a much smaller move.)'
+                    : '"Food cost is up 4.4 percent." (This implies a relative increase of 4.4%, which would mean a much smaller move.)',
+                applies: serviceLine === 'facilities-maintenance'
+                  ? 'PM compliance %, labor %, backlog aging, safety/audit scores'
+                  : serviceLine === 'facilities-housekeeping'
+                    ? 'Inspection scores, labor %, turnover rates, satisfaction scores'
+                    : 'Food cost %, labor %, participation/utilization rate, satisfaction scores',
               },
               {
                 term: 'Percent (%)',
                 rule: 'Use when describing a relative change — comparing one value to another.',
-                right: 'Retail revenue grew 12.2%. Labor costs increased 6.8% year-over-year.',
-                wrong: '"Retail revenue is up 12.2 points." (Points implies a difference between two percentages.)',
-                applies: 'Revenue changes, wage increases, year-over-year cost changes',
+                right: serviceLine === 'facilities-maintenance'
+                  ? 'Parts costs grew 9.2%. Labor costs increased 6.8% year-over-year.'
+                  : serviceLine === 'facilities-housekeeping'
+                    ? 'Supply costs grew 7.5%. Labor costs increased 6.8% year-over-year.'
+                    : 'Retail revenue grew 12.2%. Labor costs increased 6.8% year-over-year.',
+                wrong: serviceLine
+                  ? '"Labor costs are up 6.8 points." (Points implies a difference between two percentages.)'
+                  : '"Retail revenue is up 12.2 points." (Points implies a difference between two percentages.)',
+                applies: serviceLine ? 'Cost changes, wage increases, year-over-year cost changes' : 'Revenue changes, wage increases, year-over-year cost changes',
               },
               {
                 term: 'Basis Points',
-                rule: 'A finance term. 100 basis points = 1 percentage point. Do NOT use in dining operations.',
+                rule: `A finance term. 100 basis points = 1 percentage point. Do NOT use in ${serviceLine ? 'facilities' : 'dining'} operations.`,
                 right: 'Say "up 1.6 percentage points" — not "up 160 basis points."',
                 wrong: 'Using basis points in a client QBR — it sounds like you\'re trying to impress, not communicate.',
                 applies: 'Avoid entirely in client conversations',
