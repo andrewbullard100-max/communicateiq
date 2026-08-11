@@ -187,9 +187,12 @@ export default function AdminConsole() {
   const loadPolicyDocs = () => {
     setPolicyDocsLoading(true)
     fetch('/api/admin/policies')
-      .then(res => res.json())
-      .then(data => setPolicyDocs(data.documents || []))
-      .catch(() => {})
+      .then(async res => {
+        const data = await parseJsonResponse(res)
+        if (!res.ok) throw new Error(data.error || 'Failed to load documents')
+        setPolicyDocs(data.documents || [])
+      })
+      .catch(err => setToast({ type: 'error', text: err.message }))
       .finally(() => setPolicyDocsLoading(false))
   }
 
@@ -197,9 +200,12 @@ export default function AdminConsole() {
     if (!REVIEWER_ROLES_CLIENT.includes(session?.user?.role)) return
     setDraftsLoading(true)
     fetch('/api/admin/policies/drafts')
-      .then(res => res.json())
-      .then(data => setDrafts({ scenarios: data.scenarios || [], moduleConfig: data.moduleConfig || [] }))
-      .catch(() => {})
+      .then(async res => {
+        const data = await parseJsonResponse(res)
+        if (!res.ok) throw new Error(data.error || 'Failed to load drafts')
+        setDrafts({ scenarios: data.scenarios || [], moduleConfig: data.moduleConfig || [] })
+      })
+      .catch(err => setToast({ type: 'error', text: err.message }))
       .finally(() => setDraftsLoading(false))
   }
 
