@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { C, MODULES, callAI } from '../../lib/data'
+import { computeCompetencyTrend } from '../../lib/analytics'
 
 const FIELD_TASKS = [
   { id: 'clientUpdate',    label: 'Client Executive Update',     desc: 'Deliver a structured executive update using the six-part framework to a senior client stakeholder', module: 'simulation' },
@@ -39,6 +40,7 @@ export default function DashboardPage() {
 
   const completedTasks = FIELD_TASKS.filter(t => checklist[t.id]).length
   const certProgress = Math.round((completedTasks / FIELD_TASKS.length) * 100)
+  const competencyTrend = useMemo(() => computeCompetencyTrend(myResults), [myResults])
 
   function toggleTask(id) { setChecklist(c => ({ ...c, [id]: !c[id] })) }
 
@@ -112,6 +114,34 @@ Keep under 400 words. Be direct and specific.`
                 </div>
               </div>
             </div>
+
+            {/* Longitudinal competency trend — Initial → Current → Trend per dimension,
+                across every scored module (Simulation/Leadership + QBR's separate rubric),
+                not just the most recent attempt. */}
+            {Object.keys(competencyTrend.dimensions).length > 0 && (
+              <div className="card fade-up-1" style={{ marginBottom: 16 }}>
+                <span className="label">Executive Communication Profile</span>
+                <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 14 }}>
+                  Initial score is your first {Math.min(3, myResults.length)} attempt average per dimension; current is your most recent {Math.min(3, myResults.length)}. Based on {myResults.length} completed scenario{myResults.length !== 1 ? 's' : ''}.
+                </p>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {Object.entries(competencyTrend.dimensions).map(([id, d]) => (
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, background: '#F4F6F9', border: '1.5px solid #D1D5DB' }}>
+                      <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#1C2B5E' }}>{d.label}</div>
+                      <div style={{ fontSize: 12, color: '#6B7280', fontFamily: 'monospace', minWidth: 100, textAlign: 'right' }}>
+                        {d.n >= 2 ? `${d.initial.toFixed(1)} → ${d.current.toFixed(1)}` : `${d.current.toFixed(1)} (1 attempt)`}
+                      </div>
+                      <div style={{
+                        minWidth: 46, textAlign: 'center', fontSize: 12, fontWeight: 700,
+                        color: d.direction === 'up' ? C.green : d.direction === 'down' ? '#C00000' : '#9CA3AF',
+                      }}>
+                        {d.direction === 'up' ? `↑ +${d.delta.toFixed(1)}` : d.direction === 'down' ? `↓ ${d.delta.toFixed(1)}` : d.direction === 'flat' ? '→ flat' : '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Recent simulation results */}
             {myResults.length > 0 && (

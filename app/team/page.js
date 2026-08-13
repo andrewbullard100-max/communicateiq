@@ -3,18 +3,17 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { C, DIMENSIONS, LEVEL_LABELS, INDUSTRIES } from '../../lib/data'
-
-const DIM_IDS = DIMENSIONS.map(d => d.id) // ['clarity','data','ownership','tone','commitment']
+import { computeCompetencyTrend, dimensionLabel, summarizeForCoaching } from '../../lib/analytics'
 
 function avg(nums) {
   if (!nums.length) return 0
   return nums.reduce((a, b) => a + b, 0) / nums.length
 }
 
-function flagFor(user) {
-  const dimAvgs = DIM_IDS.map(id => user.dimAverages[id] || 0)
-  const overall = avg(dimAvgs)
-  const anyWeak = dimAvgs.some(v => v > 0 && v < 2)
+function flagFor(user, trend) {
+  const currents = Object.values(trend.dimensions).map(d => d.current)
+  const overall = avg(currents)
+  const anyWeak = currents.some(v => v < 2)
   const lastStatus = user.results[0]?.certificationStatus || ''
   const notYetCount = user.results.filter(r => (r.certificationStatus || '').startsWith('Not Yet')).length
 
@@ -66,14 +65,11 @@ export default function TeamDashboard() {
     })
     return Object.values(map).map(u => {
       const sorted = [...u.results].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-      const dimAverages = {}
-      DIM_IDS.forEach(id => {
-        const vals = u.results.map(r => r.scores?.[id]).filter(v => typeof v === 'number')
-        dimAverages[id] = avg(vals)
-      })
-      const user = { ...u, results: sorted, dimAverages, lastActivity: sorted[0]?.timestamp || 0 }
-      user.flag = flagFor(user)
-      user.overall = avg(DIM_IDS.map(id => dimAverages[id]).filter(Boolean))
+      const trend = computeCompetencyTrend(u.results)
+      const user = { ...u, results: sorted, trend, lastActivity: sorted[0]?.timestamp || 0 }
+      user.flag = flagFor(user, trend)
+      user.overall = trend.overall?.current || 0
+      user.coaching = summarizeForCoaching(trend)
       return user
     }).sort((a, b) => {
       const order = { red: 0, yellow: 1, green: 2 }
@@ -82,20 +78,17 @@ export default function TeamDashboard() {
     })
   }, [filtered])
 
-  const orgDimAverages = useMemo(() => {
-    const out = {}
-    DIM_IDS.forEach(id => {
-      const vals = filtered.map(r => r.scores?.[id]).filter(v => typeof v === 'number')
-      out[id] = avg(vals)
-    })
-    return out
-  }, [filtered])
+  // Org-wide trend across every scored dimension present in the filtered set
+  // (Simulation/Leadership's five plus QBR's separate five) — drives both the
+  // roster's dimension columns and the "Team-Wide Pattern" callout below.
+  const orgTrend = useMemo(() => computeCompetencyTrend(filtered), [filtered])
+  const rosterDimIds = useMemo(() => Object.keys(orgTrend.dimensions), [orgTrend])
 
   const weakestDim = useMemo(() => {
-    const entries = Object.entries(orgDimAverages).filter(([, v]) => v > 0)
+    const entries = Object.entries(orgTrend.dimensions).filter(([, d]) => d.n > 0)
     if (!entries.length) return null
-    return entries.sort((a, b) => a[1] - b[1])[0]
-  }, [orgDimAverages])
+    return entries.sort((a, b) => a[1].current - b[1].current)[0]
+  }, [orgTrend])
 
   const flaggedCount = byUser.filter(u => u.flag.level !== 'green').length
   const redCount = byUser.filter(u => u.flag.level === 'red').length
@@ -174,7 +167,7 @@ export default function TeamDashboard() {
           <div className="card fade-up" style={{ marginBottom: 20, borderLeft: '4px solid #1C2B5E' }}>
             <span className="label">Team-Wide Pattern</span>
             <p style={{ fontSize: 13.5, color: '#374151', lineHeight: 1.7, margin: 0 }}>
-              Across {filtered.length} completed scenarios, <strong>{DIMENSIONS.find(d => d.id === weakestDim[0])?.label}</strong> is the lowest-scoring dimension team-wide, averaging {weakestDim[1].toFixed(1)}/4. If this shows up across multiple people rather than one individual, it's worth a group coaching session rather than one-off feedback.
+              Across {filtered.length} completed scenarios, <strong>{weakestDim[1].label}</strong> is the lowest-scoring dimension team-wide, averaging {weakestDim[1].current.toFixed(1)}/4. If this shows up across multiple people rather than one individual, it's worth a group coaching session rather than one-off feedback.
             </p>
           </div>
         )}
@@ -207,14 +200,20 @@ export default function TeamDashboard() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                  {DIMENSIONS.map(d => {
-                    const v = u.dimAverages[d.id]
+                  {rosterDimIds.map(id => {
+                    const d = u.trend.dimensions[id]
+                    const v = d?.current
                     return (
-                      <div key={d.id} style={{ textAlign: 'center', minWidth: 56 }}>
-                        <div style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 2 }}>{d.label.split(' ')[0]}</div>
+                      <div key={id} style={{ textAlign: 'center', minWidth: 56 }}>
+                        <div style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 2 }}>{dimensionLabel(id).split(' ')[0]}</div>
                         <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color: v ? (v < 2 ? '#C00000' : v < 2.5 ? '#b87333' : C.green) : '#D1D5DB' }}>
                           {v ? v.toFixed(1) : '—'}
                         </div>
+                        {d && d.direction !== 'insufficient' && (
+                          <div style={{ fontSize: 9, fontWeight: 700, color: d.direction === 'up' ? C.green : d.direction === 'down' ? '#C00000' : '#9CA3AF' }}>
+                            {d.direction === 'up' ? `↑${d.delta.toFixed(1)}` : d.direction === 'down' ? `↓${Math.abs(d.delta).toFixed(1)}` : '→'}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -228,9 +227,10 @@ export default function TeamDashboard() {
                 </div>
               </div>
 
-              {u.results[0] && (
+              {u.coaching && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #EAECF0', fontSize: 12, color: '#6B7280' }}>
-                  Most recent: <strong style={{ color: '#374151' }}>{u.results[0].scenarioTitle}</strong> — {u.results[0].certificationStatus}
+                  Strength: <strong style={{ color: '#374151' }}>{u.coaching.strength}</strong> ({u.coaching.strengthScore.toFixed(1)}) · Development opportunity: <strong style={{ color: '#374151' }}>{u.coaching.developmentOpportunity}</strong> ({u.coaching.developmentScore.toFixed(1)})
+                  {u.results[0] && <> · Most recent: <strong style={{ color: '#374151' }}>{u.results[0].scenarioTitle}</strong> — {u.results[0].certificationStatus}</>}
                 </div>
               )}
             </div>
