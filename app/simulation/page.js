@@ -15,7 +15,7 @@ const SILENCE_MS = 3500 // stop recording after 3.5s of silence (kitchen-environ
 // not part of the authored scenario content.
 function buildSystemPrompt(scenario, pressureLevel, adaptiveDirective) {
   const pressure = PRESSURE_LEVELS.find(p => p.level === pressureLevel)
-  return `You are an AI-powered executive communication training evaluator for CommunicateIQ Executive Communication Training.
+  return `You are an AI-powered leadership training evaluator for CommunicateIQ's Food Service Leadership Training.
 
 You play TWO roles simultaneously:
 

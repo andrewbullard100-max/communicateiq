@@ -18,23 +18,17 @@ export async function middleware(req) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Role gating — the Team Dashboard is manager/org_admin/corporate_admin-
-  // facing. The real security boundary is the server-side role check in
-  // /api/results (a learner cannot read team data no matter what the client
-  // requests); this redirect is the UX layer so a learner never lands on the
-  // page at all.
-  const TEAM_VIEW_ROLES = ['manager', 'org_admin', 'corporate_admin']
-  if (pathname.startsWith('/team') && !TEAM_VIEW_ROLES.includes(token.role)) {
-    return NextResponse.redirect(new URL('/', req.url))
-  }
-
-  const ADMIN_CONSOLE_ROLES = ['org_admin', 'corporate_admin']
-  if (pathname.startsWith('/admin') && !ADMIN_CONSOLE_ROLES.includes(token.role)) {
-    return NextResponse.redirect(new URL('/', req.url))
-  }
-
-  const REVIEWER_ROLES = ['content_approver', 'org_admin', 'corporate_admin']
-  if (pathname.startsWith('/reviews') && !REVIEWER_ROLES.includes(token.role)) {
+  // Role gating for the Admin Console — Team, Reviews, and Content Upload
+  // (Policies) now live as tabs inside /admin instead of separate routes, so
+  // this one gate covers everyone who can see at least one tab there: full
+  // admins, managers (Team tab), and content roles (Content Upload/Reviews
+  // tabs). The real security boundary is still the server-side role check in
+  // each admin API route (see SECURITY.md); this redirect is the UX layer so
+  // a learner never lands on the page at all. /team and /reviews are thin
+  // client-side redirects into /admin?tab=..., so no separate gate is needed
+  // for them.
+  const ADMIN_AREA_ROLES = ['org_admin', 'corporate_admin', 'manager', 'content_author', 'content_approver']
+  if (pathname.startsWith('/admin') && !ADMIN_AREA_ROLES.includes(token.role)) {
     return NextResponse.redirect(new URL('/', req.url))
   }
 

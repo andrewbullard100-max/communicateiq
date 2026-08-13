@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { C, INDUSTRIES, TRAINING_TYPES } from '../../lib/data'
+import TeamPanel from './TeamPanel'
+import ReviewsPanel from './ReviewsPanel'
 
 const ROLES = [
   { id: 'learner', label: 'Learner' },
@@ -46,8 +48,10 @@ function AdminConsole() {
   const { data: session, status } = useSession()
   const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
   const REVIEWER_ROLES_CLIENT = ['content_approver', 'org_admin', 'corporate_admin']
+  const TEAM_VIEW_ROLES_CLIENT = ['manager', 'org_admin', 'corporate_admin']
   const canManagePolicies = CONTENT_ROLES.includes(session?.user?.role)
   const canReviewPolicies = REVIEWER_ROLES_CLIENT.includes(session?.user?.role)
+  const isTeamViewer = TEAM_VIEW_ROLES_CLIENT.includes(session?.user?.role)
   const isOrgAdmin = ['org_admin', 'corporate_admin'].includes(session?.user?.role)
   const searchParams = useSearchParams()
   const [tab, setTab] = useState('users')
@@ -61,7 +65,7 @@ function AdminConsole() {
   const [ssoBusy, setSsoBusy] = useState(false)
   const [ssoForm, setSsoForm] = useState({ enabled: false, provider: '', domain: '', tenantId: '' })
   const [loading, setLoading] = useState(true)
-  const forbidden = !loading && !isOrgAdmin && !canManagePolicies
+  const forbidden = !loading && !isOrgAdmin && !canManagePolicies && !isTeamViewer && !canReviewPolicies
   const [showAdd, setShowAdd] = useState(false)
   const [tempPasswordFor, setTempPasswordFor] = useState(null) // { name, email, password }
   const [busyId, setBusyId] = useState(null)
@@ -97,12 +101,16 @@ function AdminConsole() {
 
   useEffect(() => {
     if (status !== 'authenticated' || loading) return
-    // A direct link (e.g. the "Upload Your Policies" tile on the home page,
-    // which points to /admin?tab=policies) always wins over the role-based
+    // A direct link (e.g. the redirect stubs at /team and /reviews, or the
+    // old /admin?tab=policies deep link) always wins over the role-based
     // default — someone clicked something specific, don't second-guess it.
     const requestedTab = searchParams.get('tab')
     if (requestedTab === 'policies' && canManagePolicies) { setTab('policies'); return }
+    if (requestedTab === 'team' && isTeamViewer) { setTab('team'); return }
+    if (requestedTab === 'reviews' && canReviewPolicies) { setTab('reviews'); return }
     if (!isOrgAdmin && canManagePolicies) setTab('policies')
+    else if (!isOrgAdmin && !canManagePolicies && isTeamViewer) setTab('team')
+    else if (!isOrgAdmin && !canManagePolicies && !isTeamViewer && canReviewPolicies) setTab('reviews')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, loading])
 
@@ -513,7 +521,7 @@ function AdminConsole() {
         <div style={{ background: '#fff', padding: 32, borderRadius: 12, maxWidth: 420, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
           <div style={{ fontWeight: 700, color: C.gold, marginBottom: 6 }}>Admin Console</div>
-          <div style={{ color: '#6B7280', fontSize: 13, marginBottom: 18 }}>The Admin Console is restricted to org_admin accounts and above, or content_author/content_approver for the Policies tab.</div>
+          <div style={{ color: '#6B7280', fontSize: 13, marginBottom: 18 }}>The Admin Console is restricted to org_admin accounts and above, manager accounts (Team tab), or content_author/content_approver (Content Upload / Reviews tabs).</div>
           <Link href="/" style={{ color: C.communicateiqRed, fontSize: 13, fontWeight: 600 }}>← Back to home</Link>
         </div>
       </div>
@@ -534,6 +542,8 @@ function AdminConsole() {
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
             ...(isOrgAdmin ? ['users', 'assignments', 'activity', 'billing', 'sso'] : []),
+            ...(isTeamViewer ? ['team'] : []),
+            ...(canReviewPolicies ? ['reviews'] : []),
             ...(canManagePolicies ? ['policies'] : []),
           ].map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -542,7 +552,7 @@ function AdminConsole() {
                 fontSize: 13, fontWeight: 600,
                 background: tab === t ? C.gold : '#fff', color: tab === t ? '#fff' : C.gold,
               }}>
-              {t === 'users' ? 'Users' : t === 'assignments' ? 'Assignments' : t === 'activity' ? 'Sign-In Activity' : t === 'billing' ? 'Billing' : t === 'sso' ? 'SSO' : 'Policies'}
+              {t === 'users' ? 'Users' : t === 'assignments' ? 'Assignments' : t === 'activity' ? 'Sign-In Activity' : t === 'billing' ? 'Billing' : t === 'sso' ? 'SSO' : t === 'team' ? 'Team' : t === 'reviews' ? 'Reviews' : 'Content Upload'}
             </button>
           ))}
         </div>
@@ -684,6 +694,10 @@ function AdminConsole() {
             onSave={handleSaveSso}
           />
         )}
+
+        {tab === 'team' && isTeamViewer && <TeamPanel />}
+
+        {tab === 'reviews' && canReviewPolicies && <ReviewsPanel />}
 
         {tab === 'policies' && (
           <PoliciesPanel

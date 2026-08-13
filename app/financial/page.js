@@ -96,7 +96,7 @@ Total response under 400 words. Be specific to what they wrote, not generic.`
     if (!challengeResponse.trim()) return
     setLoading(true)
     setCoachingTab('challenge')
-    const system = `You are a master facilitator for CommunicateIQ's Executive Communication Training Program.
+    const system = `You are a master facilitator for CommunicateIQ's Food Service Leadership Training Program.
 A GM just responded to a CFO challenge. Evaluate their response using the five-dimension rubric:
 Clarity, Data Discipline, Ownership, Executive Tone, Forward Commitment (each 1-4).
 
@@ -125,6 +125,7 @@ Keep total under 300 words.`
         max_tokens: 500,
       })
       setChallengeFeedback(result)
+      sessionStorage.setItem('communicateiq_financial_complete', '1')
     } catch (err) { setChallengeFeedback(err?.message || 'Connection error. Please try again.') }
     setLoading(false)
   }

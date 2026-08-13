@@ -65,7 +65,7 @@ function LoginForm() {
         </div>
         <div style={{ height: 4, background: '#0D9488', borderRadius: 2, marginTop: 6 }} />
         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginTop: 14 }}>
-          Executive Communication Training
+          Food Service Leadership Training
         </div>
       </div>
 

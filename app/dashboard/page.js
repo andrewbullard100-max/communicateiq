@@ -54,7 +54,7 @@ export default function DashboardPage() {
   async function scoreWrittenResponse() {
     if (!writtenResponse.trim()) return
     setLoading(true)
-    const system = `You are an AI certification assessor for CommunicateIQ's Executive Communication Training Program conducting the field certification assessment.
+    const system = `You are an AI certification assessor for CommunicateIQ's Food Service Leadership Training Program conducting the field certification assessment.
 This is the official written scenario component of the full certification assessment.
 Score using the five-dimension rubric: Clarity, Data Discipline, Ownership, Executive Tone, Forward Commitment (each 1-4).
 Also assess: Multi-stakeholder navigation, Framework integration, Decision clarity.

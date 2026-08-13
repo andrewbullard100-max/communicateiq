@@ -3,7 +3,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { MODULES, INDUSTRIES, TRAINING_TYPES } from '../lib/data'
+import { CORE_FLOW, SECONDARY_MODULES, INDUSTRIES, TRAINING_TYPES } from '../lib/data'
+
+// Any role above plain learner can see the "Console →" link to the Admin
+// Console — the console itself further restricts which tabs each of these
+// roles actually sees (see lib/auth.js's TEAM_VIEW_ROLES / ADMIN_CONSOLE_ROLES
+// / REVIEWER_ROLES / CONTENT_ROLES, mirrored in app/admin/page.js).
+const ELEVATED_ROLES = ['manager', 'content_author', 'content_approver', 'org_admin', 'corporate_admin']
 
 export default function Home() {
   const router = useRouter()
@@ -11,17 +17,8 @@ export default function Home() {
   const [started, setStarted] = useState(false)
   const [industry, setIndustry] = useState(null)
   const [trainingType, setTrainingType] = useState(null)
-  const TEAM_VIEW_ROLES = ['manager', 'org_admin', 'corporate_admin']
-  const ADMIN_CONSOLE_ROLES = ['org_admin', 'corporate_admin']
-  const REVIEWER_ROLES = ['content_approver', 'org_admin', 'corporate_admin']
-  const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
-  const modules = MODULES.filter(m => {
-    if (m.orgAdminOnly) return ADMIN_CONSOLE_ROLES.includes(session?.user?.role)
-    if (m.reviewerOnly) return REVIEWER_ROLES.includes(session?.user?.role)
-    if (m.adminOnly) return TEAM_VIEW_ROLES.includes(session?.user?.role)
-    if (m.contentRoleOnly) return CONTENT_ROLES.includes(session?.user?.role)
-    return true
-  })
+  const [progress, setProgress] = useState({ diagnostic: false, stakeholder: false, simulation: false, financial: false, qbr: false })
+  const hasConsoleAccess = ELEVATED_ROLES.includes(session?.user?.role)
 
   // Check sessionStorage so navigating back doesn't re-show splash
   useEffect(() => {
@@ -34,6 +31,35 @@ export default function Home() {
       setStarted(true)
     }
   }, [])
+
+  // Best-effort progress signal for the guided flow below — not a strict
+  // gate (see app/page.js's stepper rendering), just enough to show what's
+  // done. Simulation/QBR come from persisted attempts; Stakeholder Mapping
+  // and Diagnostic don't persist server-side yet, so they read the
+  // local/session flags those pages already set on completion.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !session?.user) return
+    setProgress(p => ({
+      ...p,
+      diagnostic: sessionStorage.getItem('communicateiq_diagnostic_complete') === '1',
+      financial: sessionStorage.getItem('communicateiq_financial_complete') === '1',
+      stakeholder: (() => {
+        try { return JSON.parse(localStorage.getItem('communicateiq_stakeholders') || '[]').length > 0 }
+        catch { return false }
+      })(),
+    }))
+    fetch('/api/results?scope=self')
+      .then(res => res.json())
+      .then(data => {
+        const attempts = data.results || []
+        setProgress(p => ({
+          ...p,
+          simulation: attempts.some(r => r.moduleKey === 'simulation'),
+          qbr: attempts.some(r => r.moduleKey === 'qbr'),
+        }))
+      })
+      .catch(() => {})
+  }, [session?.user])
 
   if (!started) return (
     <div style={{
@@ -48,10 +74,10 @@ export default function Home() {
         </div>
         <div style={{ height: 4, background: '#0D9488', borderRadius: 2, marginTop: 6 }} />
         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginTop: 14 }}>
-          Executive Communication Training
+          Food Service Leadership Training
         </div>
         <div style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 700, marginTop: 6 }}>
-          Executive Communication Training Platform
+          Contract Dining & Food Service Leadership Platform
         </div>
       </div>
 
@@ -107,8 +133,8 @@ export default function Home() {
           </div>
           <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.2)' }} />
           <div>
-            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', fontFamily: 'Source Sans 3, sans-serif', marginBottom: 2 }}>{industry ? industry.label : 'Executive Communication Training'}</div>
-            <div style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 700, fontFamily: 'Source Sans 3, sans-serif' }}>{trainingType ? trainingType.label : 'Executive Communication Training Platform'}</div>
+            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', fontFamily: 'Source Sans 3, sans-serif', marginBottom: 2 }}>{industry ? industry.label : 'Food Service Leadership Training'}</div>
+            <div style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 700, fontFamily: 'Source Sans 3, sans-serif' }}>{trainingType ? trainingType.label : 'Contract Dining & Food Service Leadership Platform'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -117,6 +143,11 @@ export default function Home() {
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#0D9488' }} />
             <span style={{ color: '#99F1E8', fontSize: 11, fontWeight: 600, fontFamily: 'Source Sans 3, sans-serif', letterSpacing: 1 }}>AI COACHING ENABLED</span>
           </div>
+          {hasConsoleAccess && (
+            <Link href="/admin" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 700, textDecoration: 'none', letterSpacing: 0.5, border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '6px 12px' }}>
+              Console →
+            </Link>
+          )}
           {session?.user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>{session.user.name || session.user.email}</span>
@@ -133,9 +164,6 @@ export default function Home() {
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '44px 28px' }}>
         <div className="fade-up" style={{ marginBottom: 40 }}>
-          <div style={{ display: 'inline-block', background: '#0D9488', color: '#FFFFFF', fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', padding: '4px 12px', borderRadius: 4, marginBottom: 16 }}>
-            Proof of Concept · Enterprise Edition
-          </div>
           <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: 40, fontWeight: 900, color: '#1C2B5E', lineHeight: 1.15, marginBottom: 14 }}>
             The contract is won by sales.<br />
             <span style={{ color: '#0D9488' }}>It is retained by operators.</span>
@@ -156,42 +184,80 @@ export default function Home() {
         <div style={{ height: 1, background: '#D1D5DB', marginBottom: 28 }} />
 
         <div className="fade-up-1" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <div style={{ color: '#1C2B5E', fontSize: 10, letterSpacing: 2, fontWeight: 700, textTransform: 'uppercase' }}>Training Modules</div>
-          <div style={{ fontSize: 12, color: '#6B7280' }}>Start with the Diagnostic to personalize your learning path</div>
+          <div style={{ color: '#1C2B5E', fontSize: 10, letterSpacing: 2, fontWeight: 700, textTransform: 'uppercase' }}>Your Certification Path</div>
+          <div style={{ fontSize: 12, color: '#6B7280' }}>Work through each step in order — jump ahead any time</div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14, marginBottom: 40 }}>
-          {modules.map((mod, i) => {
-            const badge = mod.badge
-            const isHighlighted = Boolean(badge)
-            return (
-              <Link key={mod.id} href={mod.href} style={{ textDecoration: 'none' }}>
-                <div
-                  className={`fade-up-${Math.min(i+1, 5)}`}
-                  style={{ background: '#FFFFFF', border: `1.5px solid ${isHighlighted ? badge.bg : '#D1D5DB'}`, borderRadius: 10, padding: '18px 20px', boxShadow: isHighlighted ? `0 2px 12px ${badge.bg}1F` : '0 1px 4px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = badge?.bg || '#1C2B5E'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(28,43,94,0.12)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = isHighlighted ? badge.bg : '#D1D5DB'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isHighlighted ? `0 2px 12px ${badge.bg}1F` : '0 1px 4px rgba(0,0,0,0.05)' }}
-                >
-                  <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: '#F4F6F9', border: '1.5px solid #D1D5DB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{mod.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 5 }}>
-                        <span style={{ fontSize: 10, color: '#1C2B5E', fontWeight: 700, letterSpacing: 1 }}>{mod.day}</span>
-                        {badge && <span style={{ fontSize: 10, background: badge.bg, color: '#FFFFFF', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>{badge.text}</span>}
+        {(() => {
+          const completedFlags = { ...progress, dashboard: false }
+          const firstIncomplete = CORE_FLOW.findIndex(m => !completedFlags[m.id])
+          return (
+            <div style={{ position: 'relative', marginBottom: 36 }}>
+              <div style={{ position: 'absolute', left: 27, top: 8, bottom: 8, width: 2, background: '#D1D5DB' }} />
+              {CORE_FLOW.map((mod, i) => {
+                const isDone = completedFlags[mod.id]
+                const isCurrent = !isDone && (firstIncomplete === -1 ? i === CORE_FLOW.length - 1 : i === firstIncomplete)
+                const status = isDone ? 'done' : isCurrent ? 'current' : 'upcoming'
+                const dotColor = status === 'done' ? '#0D9488' : status === 'current' ? '#1C2B5E' : '#FFFFFF'
+                return (
+                  <Link key={mod.id} href={mod.href} style={{ textDecoration: 'none' }}>
+                    <div
+                      className={`fade-up-${Math.min(i + 1, 5)}`}
+                      style={{
+                        position: 'relative', display: 'flex', gap: 16, alignItems: 'center',
+                        background: status === 'upcoming' ? '#F4F6F9' : '#FFFFFF',
+                        border: `1.5px solid ${status === 'current' ? '#1C2B5E' : '#D1D5DB'}`,
+                        borderRadius: 10, padding: '14px 20px', marginBottom: 10, cursor: 'pointer',
+                        opacity: status === 'upcoming' ? 0.75 : 1,
+                        boxShadow: status === 'current' ? '0 2px 12px rgba(28,43,94,0.12)' : '0 1px 4px rgba(0,0,0,0.05)',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{
+                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0, zIndex: 1,
+                        background: dotColor, border: `2px solid ${status === 'upcoming' ? '#D1D5DB' : dotColor}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 17, color: status === 'upcoming' ? '#6B7280' : '#FFFFFF', fontWeight: 700,
+                      }}>
+                        {isDone ? '✓' : mod.icon}
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: '#1C2B5E', marginBottom: 4 }}>{mod.label}</div>
-                      <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>{mod.desc}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3 }}>
+                          <span style={{ fontSize: 10, color: '#1C2B5E', fontWeight: 700, letterSpacing: 1 }}>{mod.day}</span>
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                            padding: '2px 8px', borderRadius: 10,
+                            background: status === 'done' ? 'rgba(13,148,136,0.15)' : status === 'current' ? 'rgba(28,43,94,0.1)' : '#EDEFF2',
+                            color: status === 'done' ? '#0D9488' : status === 'current' ? '#1C2B5E' : '#9CA3AF',
+                          }}>
+                            {status === 'done' ? 'Completed' : status === 'current' ? 'Current' : 'Not Started'}
+                          </span>
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#1C2B5E', marginBottom: 2 }}>{mod.label}</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>{mod.desc}</div>
+                      </div>
+                      <div style={{ color: '#1C2B5E', fontSize: 18, flexShrink: 0, fontWeight: 700 }}>›</div>
                     </div>
-                    <div style={{ color: '#1C2B5E', fontSize: 18, flexShrink: 0, fontWeight: 700 }}>›</div>
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )
+        })()}
 
-        <div style={{ background: '#FFFFFF', border: '1.5px solid #D1D5DB', borderLeft: '4px solid #1C2B5E', borderRadius: 8, padding: '14px 20px', fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
-          <strong style={{ color: '#1C2B5E' }}>Certification path:</strong> Complete the Diagnostic → build your Stakeholder Map → complete Role-Play Simulations → master Financial Storytelling → deliver your QBR. Full certification requires 80%+ on the AI-scored field assessment plus District Manager validation.
+        <div className="fade-up-1" style={{ marginBottom: 14, color: '#1C2B5E', fontSize: 10, letterSpacing: 2, fontWeight: 700, textTransform: 'uppercase' }}>More</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+          {SECONDARY_MODULES.map(mod => (
+            <Link key={mod.id} href={mod.href} style={{ textDecoration: 'none' }}>
+              <div style={{ background: '#FFFFFF', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: '#F4F6F9', border: '1.5px solid #D1D5DB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{mod.icon}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#1C2B5E' }}>{mod.label}</div>
+                  <div style={{ fontSize: 11.5, color: '#6B7280' }}>{mod.desc}</div>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </div>

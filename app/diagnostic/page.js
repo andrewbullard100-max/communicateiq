@@ -27,7 +27,7 @@ export default function DiagnosticPage() {
     setLoading(true)
     setSubmitted(true)
     const scoreList = DIAGNOSTIC_QUESTIONS.map(q => `${q.label}: ${scores[q.id]}/5`).join('\n')
-    const system = `You are a master facilitator for CommunicateIQ's Executive Communication Training Program. 
+    const system = `You are a master facilitator for CommunicateIQ's Food Service Leadership Training Program.
 You have just received a participant's pre-course diagnostic results. Your job is to provide a 
 personalized, specific learning plan — not generic encouragement. Be direct, specific, and practical.
 Format your response with clear sections using these exact headers:
@@ -53,6 +53,7 @@ Provide a personalized learning plan based on these results.`
         max_tokens: 600,
       })
       setAnalysis(result)
+      sessionStorage.setItem('communicateiq_diagnostic_complete', '1')
     } catch (e) {
       setAnalysis('Unable to generate analysis. Please check your connection and try again.')
     }

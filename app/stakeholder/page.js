@@ -65,7 +65,7 @@ setLoading(true)
       `${c.name} (${c.title}): Cares about "${c.cares}". Influence mechanism: "${c.influence}". Relationship ${c.relationship}/5`
     ).join('\n')
 
-    const system = `You are a master facilitator for CommunicateIQ's Executive Communication Training Program reviewing a GM's stakeholder map.
+    const system = `You are a master facilitator for CommunicateIQ's Food Service Leadership Training Program reviewing a GM's stakeholder map.
 Your job is to identify gaps, blind spots, and risks — and give specific, actionable coaching. Be direct.
 Format with these exact headers:
 ## Strengths in This Map
