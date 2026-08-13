@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { C, SCENARIOS, DIMENSIONS, LEVEL_LABELS, LEVEL_COLORS, INDUSTRIES, TRAINING_TYPES, callAI } from '../../lib/data'
 import { computeCompetencyTrend } from '../../lib/analytics'
+import { playStreamedSpeech } from '../../lib/streamSpeech'
 import { PRESSURE_LEVELS, recommendPressureLevel, buildAdaptiveDirective } from '../../lib/pressure'
 
 const SILENCE_MS = 3500 // stop recording after 3.5s of silence (kitchen-environment tuned)
@@ -206,22 +207,19 @@ useEffect(() => {
         body: JSON.stringify({ text }),
       })
       if (!res.ok) { setSpeaking(false); if (autoMic) startRecording(); return }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
+      const { audio } = await playStreamedSpeech(res, {
+        onEnded: () => {
+          setSpeaking(false)
+          audioRef.current = null
+          if (autoMic && !isLoading.current) startRecording()
+        },
+        onError: () => {
+          setSpeaking(false)
+          audioRef.current = null
+          if (autoMic && !isLoading.current) startRecording()
+        },
+      })
       audioRef.current = audio
-      audio.onended = () => {
-        setSpeaking(false)
-        audioRef.current = null
-        URL.revokeObjectURL(url)
-        if (autoMic && !isLoading.current) startRecording()
-      }
-      audio.onerror = () => {
-        setSpeaking(false)
-        audioRef.current = null
-        if (autoMic && !isLoading.current) startRecording()
-      }
-      await audio.play()
     } catch {
       setSpeaking(false)
       if (autoMic && !isLoading.current) startRecording()

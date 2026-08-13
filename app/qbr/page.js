@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { C, callAI, getSelectedIndustryId, getSelectedServiceLine, getIndustryConfig, applyOrgConfig, TRAINING_TYPES } from '../../lib/data'
+import { playStreamedSpeech } from '../../lib/streamSpeech'
 
 const SILENCE_MS = 5000
 
@@ -107,17 +108,14 @@ function QBRPage() {
         body: JSON.stringify({ text }),
       })
       if (!res.ok) return
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
+      const { audio } = await playStreamedSpeech(res, {
+        onEnded: () => {
+          audioRef.current = null
+          if (autoMic) startRecording()
+        },
+        onError: () => { audioRef.current = null },
+      })
       audioRef.current = audio
-      audio.onended = () => {
-        audioRef.current = null
-        URL.revokeObjectURL(url)
-        if (autoMic) startRecording()
-      }
-      audio.onerror = () => { audioRef.current = null }
-      await audio.play()
     } catch {}
   }
 

@@ -42,18 +42,36 @@ export async function POST(req) {
 
     const voice = VALID_VOICES.has(requestedVoice) ? requestedVoice : DEFAULT_VOICE
 
-    const mp3 = await openai.audio.speech.create({
+    const speech = await openai.audio.speech.create({
       model: 'tts-1',
       voice,
       input: clean,
       speed: 0.95,
     })
 
-    const buffer = Buffer.from(await mp3.arrayBuffer())
-    return new Response(buffer, {
+    // Pipe OpenAI's response straight through as it arrives instead of
+    // buffering the full mp3 into memory first. This drops time-to-first-byte
+    // from "however long the whole line takes to synthesize" to "however long
+    // the first chunk takes" — the client (see lib/streamSpeech.js) plays
+    // chunks as they land via MediaSource, with a blob-based fallback for
+    // browsers that don't support MSE for audio/mpeg.
+    if (!speech.body) {
+      // Defensive fallback in case a future SDK/runtime doesn't give us a
+      // streamable body — behave like the old buffered path rather than 500.
+      const buffer = Buffer.from(await speech.arrayBuffer())
+      return new Response(buffer, {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': buffer.length.toString(),
+        },
+      })
+    }
+
+    return new Response(speech.body, {
       headers: {
         'Content-Type': 'audio/mpeg',
-        'Content-Length': buffer.length.toString(),
+        'Cache-Control': 'no-store',
+        'Transfer-Encoding': 'chunked',
       },
     })
   } catch (err) {
