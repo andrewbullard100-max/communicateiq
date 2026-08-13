@@ -24,7 +24,7 @@ export async function POST(req) {
     // QBR). Silently skipped (not an error) for modules with no transcript
     // or for orgs with transcript_retention = 'none'.
     if (body.transcript?.length && session.user.orgId) {
-      await saveTranscriptIfRetained({ attemptId, orgId: session.user.orgId, messages: body.transcript })
+      await saveTranscriptIfRetained({ attemptId, orgId: session.user.orgId, userId: session.user.id, messages: body.transcript })
     }
 
     return Response.json({ ok: true, attemptId })
@@ -56,7 +56,7 @@ export async function GET(req) {
       if (!session.user.orgId) {
         return Response.json({ results: [], configured: storageConfigured() })
       }
-      const results = await getOrgAttempts(session.user.orgId)
+      const results = await getOrgAttempts(session.user.orgId, session.user.id)
       return Response.json({ results, configured: storageConfigured() })
     }
 

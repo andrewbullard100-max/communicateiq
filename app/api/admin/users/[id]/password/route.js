@@ -12,7 +12,7 @@ export async function POST(req, { params }) {
 
   try {
     const tempPassword = generateTempPassword()
-    await resetOrgUserPassword(session.user.orgId, params.id, tempPassword)
+    await resetOrgUserPassword(session.user.orgId, params.id, tempPassword, session.user.id)
     // Returned exactly once — hand it to the user out of band (not email/Slack in plaintext).
     return Response.json({ tempPassword })
   } catch (err) {

@@ -19,7 +19,7 @@ export async function GET() {
   if (error) return error
 
   try {
-    const users = await listOrgUsers(session.user.orgId)
+    const users = await listOrgUsers(session.user.orgId, session.user.id)
     return Response.json({ users })
   } catch (err) {
     console.error('List org users error:', err)

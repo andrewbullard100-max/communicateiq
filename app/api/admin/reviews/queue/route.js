@@ -11,7 +11,7 @@ export async function GET() {
   if (!session.user.orgId) return Response.json({ queue: [] })
 
   try {
-    const queue = await listReviewQueue(session.user.orgId)
+    const queue = await listReviewQueue(session.user.orgId, session.user.id)
     return Response.json({ queue })
   } catch (err) {
     console.error('List review queue error:', err)

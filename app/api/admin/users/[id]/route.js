@@ -26,7 +26,7 @@ export async function PATCH(req, { params }) {
       managerId: body.managerId,
       orgUnitId: body.orgUnitId,
       roles: body.roles,
-    })
+    }, session.user.id)
     return Response.json(result)
   } catch (err) {
     console.error('Update org user error:', err)
@@ -45,7 +45,7 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    const result = await deactivateOrgUser(session.user.orgId, params.id)
+    const result = await deactivateOrgUser(session.user.orgId, params.id, session.user.id)
     return Response.json(result)
   } catch (err) {
     console.error('Deactivate org user error:', err)

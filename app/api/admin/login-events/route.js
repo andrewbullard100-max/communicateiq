@@ -11,7 +11,7 @@ export async function GET() {
   if (!session.user.orgId) return Response.json({ events: [] })
 
   try {
-    const events = await listRecentLoginEvents(session.user.orgId, 50)
+    const events = await listRecentLoginEvents(session.user.orgId, session.user.id, 50)
     return Response.json({ events })
   } catch (err) {
     console.error('List login events error:', err)

@@ -11,7 +11,7 @@ export async function GET() {
   if (!session.user.orgId) return Response.json({ reviewedCount: 0, byTrainingType: {} })
 
   try {
-    const stats = await getAgreementStats(session.user.orgId)
+    const stats = await getAgreementStats(session.user.orgId, session.user.id)
     return Response.json(stats)
   } catch (err) {
     console.error('Get agreement stats error:', err)

@@ -17,7 +17,7 @@ export async function GET(req, { params }) {
   if (error) return error
 
   try {
-    const detail = await getAttemptForReview(session.user.orgId, params.attemptId)
+    const detail = await getAttemptForReview(session.user.orgId, params.attemptId, session.user.id)
     return Response.json(detail)
   } catch (err) {
     console.error('Get attempt for review error:', err)
