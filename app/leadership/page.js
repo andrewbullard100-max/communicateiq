@@ -1,6 +1,7 @@
 'use client'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { C, LEADERSHIP_SCENARIOS, DIMENSIONS, LEVEL_LABELS, LEVEL_COLORS, INDUSTRIES, callAI } from '../../lib/data'
 
 const SILENCE_MS = 3500
@@ -59,7 +60,7 @@ function parseScoringResult(text) {
   } catch { return null }
 }
 
-function persistResult(scenario, scored) {
+function persistResult(scenario, scored, assignmentId) {
   if (!scenario || !scored?.scores) return
   fetch('/api/results', {
     method: 'POST',
@@ -69,6 +70,8 @@ function persistResult(scenario, scored) {
       scenarioTitle: scenario.title,
       industry: scenario.industry,
       trainingType: scenario.trainingType,
+      moduleKey: 'leadership',
+      assignmentId: assignmentId || null,
       scores: scored.scores,
       certificationStatus: scored.certificationStatus,
       headline: scored.headline,
@@ -89,7 +92,9 @@ function ScoreBar({ value }) {
   )
 }
 
-export default function LeadershipPage() {
+function LeadershipPage() {
+  const searchParams = useSearchParams()
+  const assignmentId = searchParams.get('assignmentId')
   const [screen, setScreen] = useState('select')
   const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
@@ -304,7 +309,7 @@ export default function LeadershipPage() {
       const scored = parseScoringResult(aiText)
       if (scored) {
         setResult(scored)
-        persistResult(selectedRef.current, scored)
+        persistResult(selectedRef.current, scored, assignmentId)
         setScreen('results')
       } else {
         const updatedMsgs = [...newMsgs, { role: 'assistant', content: aiText }]
@@ -376,7 +381,7 @@ export default function LeadershipPage() {
       const scored = parseScoringResult(text)
       if (scored) {
         setResult(scored)
-        persistResult(selectedRef.current, scored)
+        persistResult(selectedRef.current, scored, assignmentId)
         setScreen('results')
       } else {
         const retry = await callAI({
@@ -385,7 +390,7 @@ export default function LeadershipPage() {
           max_tokens: 800
         })
         const scoredRetry = parseScoringResult(retry)
-        if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry); setScreen('results') }
+        if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry, assignmentId); setScreen('results') }
       }
     } catch {}
     isLoading.current = false
@@ -715,4 +720,12 @@ export default function LeadershipPage() {
     )
   }
   return null
+}
+
+export default function LeadershipPageRoute() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.gray }}>Loading…</div>}>
+      <LeadershipPage />
+    </Suspense>
+  )
 }

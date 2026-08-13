@@ -66,6 +66,12 @@ function AdminConsole() {
   const [tempPasswordFor, setTempPasswordFor] = useState(null) // { name, email, password }
   const [busyId, setBusyId] = useState(null)
   const [toast, setToast] = useState(null)
+  const [assignments, setAssignments] = useState([])
+  const [cohorts, setCohorts] = useState([])
+  const [orgUnits, setOrgUnits] = useState([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true)
+  const [showCreateAssignment, setShowCreateAssignment] = useState(false)
+  const [assignmentBusy, setAssignmentBusy] = useState(false)
 
   const loadUsers = () => {
     fetch('/api/admin/users')
@@ -117,6 +123,84 @@ function AdminConsole() {
       .catch(() => {})
       .finally(() => setBillingLoading(false))
   }, [status, tab])
+
+  const loadAssignments = () => {
+    setAssignmentsLoading(true)
+    Promise.all([
+      fetch('/api/admin/assignments').then(res => res.json()),
+      fetch('/api/admin/cohorts').then(res => res.json()),
+      fetch('/api/admin/org-units').then(res => res.json()),
+    ])
+      .then(([a, c, o]) => {
+        setAssignments(a.assignments || [])
+        setCohorts(c.cohorts || [])
+        setOrgUnits(o.orgUnits || [])
+      })
+      .catch(() => {})
+      .finally(() => setAssignmentsLoading(false))
+  }
+
+  useEffect(() => {
+    if (status !== 'authenticated' || tab !== 'assignments') return
+    loadAssignments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, tab])
+
+  async function handleCreateAssignment(form) {
+    setAssignmentBusy(true)
+    try {
+      const res = await fetch('/api/admin/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await parseJsonResponse(res)
+      if (!res.ok) throw new Error(data.error || 'Failed to create assignment')
+      setShowCreateAssignment(false)
+      setToast({ type: 'success', text: 'Assignment created.' })
+      loadAssignments()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    } finally {
+      setAssignmentBusy(false)
+    }
+  }
+
+  async function handleCancelAssignment(id) {
+    setBusyId(id)
+    try {
+      const res = await fetch(`/api/admin/assignments/${id}`, { method: 'DELETE' })
+      const data = await parseJsonResponse(res)
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel assignment')
+      setToast({ type: 'success', text: 'Assignment cancelled.' })
+      loadAssignments()
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleCreateCohort(name, memberUserIds) {
+    setAssignmentBusy(true)
+    try {
+      const res = await fetch('/api/admin/cohorts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, memberUserIds }),
+      })
+      const data = await parseJsonResponse(res)
+      if (!res.ok) throw new Error(data.error || 'Failed to create cohort')
+      setToast({ type: 'success', text: `Cohort "${name}" created.` })
+      loadAssignments()
+      return data.cohort
+    } catch (err) {
+      setToast({ type: 'error', text: err.message })
+      return null
+    } finally {
+      setAssignmentBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (status !== 'authenticated' || tab !== 'sso') return
@@ -449,7 +533,7 @@ function AdminConsole() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
-            ...(isOrgAdmin ? ['users', 'activity', 'billing', 'sso'] : []),
+            ...(isOrgAdmin ? ['users', 'assignments', 'activity', 'billing', 'sso'] : []),
             ...(canManagePolicies ? ['policies'] : []),
           ].map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -458,7 +542,7 @@ function AdminConsole() {
                 fontSize: 13, fontWeight: 600,
                 background: tab === t ? C.gold : '#fff', color: tab === t ? '#fff' : C.gold,
               }}>
-              {t === 'users' ? 'Users' : t === 'activity' ? 'Sign-In Activity' : t === 'billing' ? 'Billing' : t === 'sso' ? 'SSO' : 'Policies'}
+              {t === 'users' ? 'Users' : t === 'assignments' ? 'Assignments' : t === 'activity' ? 'Sign-In Activity' : t === 'billing' ? 'Billing' : t === 'sso' ? 'SSO' : 'Policies'}
             </button>
           ))}
         </div>
@@ -539,6 +623,19 @@ function AdminConsole() {
           </>
         )}
 
+        {tab === 'assignments' && (
+          <AssignmentsPanel
+            assignments={assignments}
+            cohorts={cohorts}
+            orgUnits={orgUnits}
+            users={users}
+            loading={assignmentsLoading}
+            busyId={busyId}
+            onCreate={() => setShowCreateAssignment(true)}
+            onCancel={handleCancelAssignment}
+          />
+        )}
+
         {tab === 'activity' && (
           <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -608,6 +705,17 @@ function AdminConsole() {
       </div>
 
       {showAdd && <AddUserModal onCancel={() => setShowAdd(false)} onSubmit={handleAdd} busy={busyId === 'new'} />}
+      {showCreateAssignment && (
+        <CreateAssignmentModal
+          users={users}
+          orgUnits={orgUnits}
+          cohorts={cohorts}
+          busy={assignmentBusy}
+          onCancel={() => setShowCreateAssignment(false)}
+          onSubmit={handleCreateAssignment}
+          onCreateCohort={handleCreateCohort}
+        />
+      )}
       {tempPasswordFor && <TempPasswordModal info={tempPasswordFor} onClose={() => setTempPasswordFor(null)} />}
       {toast && (
         <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
@@ -770,6 +878,224 @@ function SsoPanel({ data, loading, busy, form, setForm, onSave }) {
         style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: C.communicateiqRed, color: '#fff', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
         {busy ? 'Saving…' : 'Save SSO Settings'}
       </button>
+    </div>
+  )
+}
+
+// ─── Assignments tab ─────────────────────────────────────────────────────────
+// Kept in sync with lib/assignments.js's ASSIGNABLE_MODULE_KEYS — only the
+// three modules that currently persist a simulation_attempts row at all
+// (Financial/Stakeholder/Diagnostic don't call /api/results yet).
+const MODULE_OPTIONS = [
+  { key: 'simulation', label: 'Client Role-Play Simulation' },
+  { key: 'leadership', label: 'Leadership Simulation' },
+  { key: 'qbr', label: 'QBR Delivery' },
+]
+const MODULE_LABEL = Object.fromEntries(MODULE_OPTIONS.map(m => [m.key, m.label]))
+
+function fmtDueDate(iso) {
+  if (!iso) return 'No due date'
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function AssignmentsPanel({ assignments, cohorts, orgUnits, users, loading, busyId, onCreate, onCancel }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button onClick={onCreate}
+          style={{ background: C.communicateiqRed, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          + New Assignment
+        </button>
+      </div>
+
+      {loading && <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Loading…</div>}
+
+      {!loading && !assignments.length && (
+        <div style={{ background: '#fff', borderRadius: 10, padding: 32, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+          No assignments yet. Create one to assign Simulation, Leadership, or QBR training to a person, org unit, or cohort with a due date and passing score.
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {assignments.map(a => {
+          const pct = a.progress.total ? Math.round((a.progress.complete / a.progress.total) * 100) : 0
+          return (
+            <div key={a.id} style={{ background: '#fff', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.gold, fontSize: 14 }}>{a.trackName}</div>
+                  <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                    {a.moduleKeys.map(k => MODULE_LABEL[k] || k).join(' · ')}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#374151', marginTop: 4 }}>
+                    Target: <strong>{a.target}</strong> · Due: {fmtDueDate(a.dueAt)}
+                    {a.passingScore != null && <> · Passing: {a.passingScore}%</>}
+                  </div>
+                </div>
+                <button onClick={() => onCancel(a.id)} disabled={busyId === a.id}
+                  style={{ fontSize: 12, background: 'none', border: '1px solid #F0B8B8', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: C.red, whiteSpace: 'nowrap' }}>
+                  {busyId === a.id ? 'Cancelling…' : 'Cancel'}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: '#F0F1F3' }}>
+                  {a.progress.certified > 0 && <div style={{ width: `${(a.progress.certified / a.progress.total) * 100}%`, background: C.green }} />}
+                  {a.progress.needsCoaching > 0 && <div style={{ width: `${(a.progress.needsCoaching / a.progress.total) * 100}%`, background: '#b87333' }} />}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#6B7280', marginTop: 6 }}>
+                  <strong style={{ color: '#374151' }}>{a.progress.complete}/{a.progress.total}</strong> complete ({pct}%)
+                  {a.progress.certified > 0 && <> · <span style={{ color: C.green }}>{a.progress.certified} certified</span></>}
+                  {a.progress.needsCoaching > 0 && <> · <span style={{ color: '#b87333' }}>{a.progress.needsCoaching} need coaching</span></>}
+                  {a.progress.incomplete > 0 && <> · <span style={{ color: '#9CA3AF' }}>{a.progress.incomplete} incomplete</span></>}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CreateAssignmentModal({ users, orgUnits, cohorts, busy, onCancel, onSubmit, onCreateCohort }) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [moduleKeys, setModuleKeys] = useState([])
+  const [targetType, setTargetType] = useState('user')
+  const [targetId, setTargetId] = useState('')
+  const [dueAt, setDueAt] = useState('')
+  const [passingScore, setPassingScore] = useState('')
+  const [showNewCohort, setShowNewCohort] = useState(false)
+  const [newCohortName, setNewCohortName] = useState('')
+  const [newCohortMembers, setNewCohortMembers] = useState([])
+
+  function toggleModule(key) {
+    setModuleKeys(m => m.includes(key) ? m.filter(k => k !== key) : [...m, key])
+  }
+
+  async function handleCreateCohortInline() {
+    if (!newCohortName.trim()) return
+    const cohort = await onCreateCohort(newCohortName.trim(), newCohortMembers)
+    if (cohort) {
+      setTargetId(cohort.id)
+      setShowNewCohort(false)
+      setNewCohortName('')
+      setNewCohortMembers([])
+    }
+  }
+
+  const canSubmit = name.trim() && moduleKeys.length > 0 && targetId
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 440, maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ fontWeight: 700, color: C.gold, marginBottom: 16, fontSize: 15 }}>New Assignment</div>
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="FY27 Client Retention Training"
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 12, fontSize: 13 }} />
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Description <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(optional)</span></label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 12, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Required modules</label>
+        <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
+          {MODULE_OPTIONS.map(m => (
+            <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={moduleKeys.includes(m.key)} onChange={() => toggleModule(m.key)} />
+              {m.label}
+            </label>
+          ))}
+        </div>
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Assign to</label>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 12 }}>
+          {[['user', 'Person'], ['org_unit', 'Org unit (+ reports)'], ['cohort', 'Cohort']].map(([id, label]) => (
+            <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+              <input type="radio" checked={targetType === id} onChange={() => { setTargetType(id); setTargetId('') }} />
+              {label}
+            </label>
+          ))}
+        </div>
+
+        {targetType === 'user' && (
+          <select value={targetId} onChange={e => setTargetId(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 14, fontSize: 13 }}>
+            <option value="">Select a person…</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+          </select>
+        )}
+
+        {targetType === 'org_unit' && (
+          <select value={targetId} onChange={e => setTargetId(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 14, fontSize: 13 }}>
+            <option value="">Select an org unit…</option>
+            {orgUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        )}
+
+        {targetType === 'cohort' && (
+          <div style={{ marginBottom: 14 }}>
+            <select value={targetId} onChange={e => setTargetId(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 8, fontSize: 13 }}>
+              <option value="">Select a cohort…</option>
+              {cohorts.map(c => <option key={c.id} value={c.id}>{c.name} ({c.memberCount} members)</option>)}
+            </select>
+            {!showNewCohort ? (
+              <button onClick={() => setShowNewCohort(true)} type="button"
+                style={{ fontSize: 12, background: 'none', border: 'none', color: C.gold, fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                + Create a new cohort
+              </button>
+            ) : (
+              <div style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: 10, marginTop: 6 }}>
+                <input value={newCohortName} onChange={e => setNewCohortName(e.target.value)} placeholder="Cohort name"
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 8, fontSize: 12 }} />
+                <div style={{ maxHeight: 120, overflowY: 'auto', marginBottom: 8, border: '1px solid #EEF0F3', borderRadius: 6, padding: 6 }}>
+                  {users.map(u => (
+                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={newCohortMembers.includes(u.id)}
+                        onChange={() => setNewCohortMembers(m => m.includes(u.id) ? m.filter(x => x !== u.id) : [...m, u.id])} />
+                      {u.name}
+                    </label>
+                  ))}
+                </div>
+                <button onClick={handleCreateCohortInline} disabled={busy || !newCohortName.trim()} type="button"
+                  style={{ fontSize: 12, padding: '6px 12px', borderRadius: 6, border: 'none', background: C.communicateiqRed, color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+                  Create Cohort
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Due date <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(optional)</span></label>
+        <input type="date" value={dueAt} onChange={e => setDueAt(e.target.value)}
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 12, fontSize: 13 }} />
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Passing score % <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(optional — leave blank to count completion alone as certified)</span></label>
+        <input type="number" min="0" max="100" value={passingScore} onChange={e => setPassingScore(e.target.value)} placeholder="80"
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 20, fontSize: 13 }} />
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #D1D5DB', background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          <button
+            disabled={busy || !canSubmit}
+            onClick={() => onSubmit({
+              name: name.trim(),
+              description: description.trim() || null,
+              moduleKeys,
+              targetType,
+              targetId,
+              dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+              passingScore: passingScore !== '' ? Number(passingScore) : null,
+            })}
+            style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: C.communicateiqRed, color: '#fff', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy || !canSubmit ? 0.6 : 1 }}>
+            {busy ? 'Creating…' : 'Create Assignment'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

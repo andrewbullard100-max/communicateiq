@@ -12,9 +12,11 @@ export async function POST(req) {
     const attemptId = await saveAttempt({
       userId: session.user.id,
       orgId: session.user.orgId,
+      assignmentId: body.assignmentId || null,
       scenarioLabel: body.scenarioTitle || body.scenarioId || null,
       industry: body.industry || null,
       trainingType: body.trainingType || null,
+      moduleKey: body.moduleKey || null,
       scores: body.scores || null, // { clarity, data, ownership, tone, commitment } each 1-4 (dimension keys vary by module)
       certificationStatus: body.certificationStatus || null,
       headline: body.headline || null,

@@ -1,6 +1,7 @@
 'use client'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { C, SCENARIOS, DIMENSIONS, LEVEL_LABELS, LEVEL_COLORS, INDUSTRIES, TRAINING_TYPES, callAI } from '../../lib/data'
 
 const SILENCE_MS = 3500 // stop recording after 3.5s of silence (kitchen-environment tuned)
@@ -51,7 +52,13 @@ function parseScoringResult(text) {
   } catch { return null }
 }
 
-function persistResult(scenario, scored, transcript) {
+// assignmentId comes from the ?assignmentId= query param when the trainee
+// arrived here via "Start" on an assigned campaign (see app/dashboard's
+// My Assignments card) — attributing the attempt lets the admin/manager
+// progress rollup on that assignment count it. moduleKey identifies which
+// module produced the attempt (see migration add_module_key_to_
+// simulation_attempts) so a multi-module assignment can tell them apart.
+function persistResult(scenario, scored, transcript, assignmentId) {
   if (!scenario || !scored?.scores) return
   fetch('/api/results', {
     method: 'POST',
@@ -61,6 +68,8 @@ function persistResult(scenario, scored, transcript) {
       scenarioTitle: scenario.title,
       industry: scenario.industry,
       trainingType: scenario.trainingType,
+      moduleKey: 'simulation',
+      assignmentId: assignmentId || null,
       scores: scored.scores,
       certificationStatus: scored.certificationStatus,
       headline: scored.headline,
@@ -82,7 +91,9 @@ function ScoreBar({ value }) {
   )
 }
 
-export default function SimulationPage() {
+function SimulationPage() {
+  const searchParams = useSearchParams()
+  const assignmentId = searchParams.get('assignmentId')
   const [screen, setScreen] = useState('select')
   const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
@@ -321,7 +332,7 @@ useEffect(() => {
       const scored = parseScoringResult(aiText)
       if (scored) {
         setResult(scored)
-        persistResult(selectedRef.current, scored, messagesRef.current)
+        persistResult(selectedRef.current, scored, messagesRef.current, assignmentId)
         setScreen('results')
       } else {
         const updatedMsgs = [...newMsgs, { role: 'assistant', content: aiText }]
@@ -396,7 +407,7 @@ useEffect(() => {
     const scored = parseScoringResult(text)
     if (scored) { 
       setResult(scored)
-      persistResult(selectedRef.current, scored, messagesRef.current)
+      persistResult(selectedRef.current, scored, messagesRef.current, assignmentId)
       setScreen('results') 
     } else {
       // Force it with a second attempt
@@ -406,7 +417,7 @@ useEffect(() => {
         max_tokens: 800
       })
       const scoredRetry = parseScoringResult(retry)
-      if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry, messagesRef.current); setScreen('results') }
+      if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry, messagesRef.current, assignmentId); setScreen('results') }
     }
   } catch {}
   isLoading.current = false
@@ -721,4 +732,12 @@ useEffect(() => {
     )
   }
   return null
+}
+
+export default function SimulationPageRoute() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.gray }}>Loading…</div>}>
+      <SimulationPage />
+    </Suspense>
+  )
 }

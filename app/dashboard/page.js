@@ -18,6 +18,8 @@ const CERT_SCENARIOS = [
   { id: 'map',     label: 'Stakeholder Map Submission', desc: 'Submit final account map with all required elements verified by AI', weight: '20%' },
 ]
 
+const MODULE_ROUTES = { simulation: '/simulation', leadership: '/leadership', qbr: '/qbr' }
+
 const WRITTEN_SCENARIO = `You are 8 weeks post-bootcamp. Your CFO just received a complaint from three faculty members about the catering quality at last week's distinguished lecture dinner. Simultaneously, your spring satisfaction survey shows a 9-point decline in staff friendliness. The CFO has called a meeting for tomorrow morning. Write your preparation: (1) your opening statement for the meeting, (2) your action plan for each issue, and (3) the one decision you need from the CFO by end of meeting.`
 
 export default function DashboardPage() {
@@ -30,11 +32,16 @@ export default function DashboardPage() {
   const [dmNotes, setDmNotes] = useState('')
   const [dmObservations, setDmObservations] = useState('')
   const [myResults, setMyResults] = useState([])
+  const [myAssignments, setMyAssignments] = useState([])
 
   useEffect(() => {
     fetch('/api/results?scope=self')
       .then(res => res.json())
       .then(data => setMyResults((data.results || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))))
+      .catch(() => {})
+    fetch('/api/assignments')
+      .then(res => res.json())
+      .then(data => setMyAssignments(data.assignments || []))
       .catch(() => {})
   }, [])
 
@@ -114,6 +121,42 @@ Keep under 400 words. Be direct and specific.`
                 </div>
               </div>
             </div>
+
+            {/* My Assignments */}
+            {myAssignments.length > 0 && (
+              <div className="card fade-up-1" style={{ marginBottom: 16 }}>
+                <span className="label">My Assignments</span>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {myAssignments.map(a => (
+                    <div key={a.id} style={{ padding: '12px 14px', borderRadius: 8, background: '#F4F6F9', border: `1.5px solid ${a.complete ? C.green : '#D1D5DB'}` }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1C2B5E' }}>
+                        {a.complete ? '✅ ' : ''}{a.trackName}
+                      </div>
+                      {a.dueAt && (
+                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                          Due {new Date(a.dueAt).toLocaleDateString()}{a.passingScore != null ? ` · Passing score: ${a.passingScore}%` : ''}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                        {a.modules.map(m => (
+                          m.complete ? (
+                            <span key={m.key} style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: `${C.green}22`, color: C.green, fontWeight: 600 }}>
+                              ✓ {m.label}
+                            </span>
+                          ) : (
+                            <Link key={m.key} href={`${MODULE_ROUTES[m.key] || '/'}?assignmentId=${a.id}`} style={{ textDecoration: 'none' }}>
+                              <span style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: 'rgba(28,43,94,0.08)', color: C.gold, fontWeight: 600, cursor: 'pointer' }}>
+                                Start {m.label} →
+                              </span>
+                            </Link>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Longitudinal competency trend — Initial → Current → Trend per dimension,
                 across every scored module (Simulation/Leadership + QBR's separate rubric),

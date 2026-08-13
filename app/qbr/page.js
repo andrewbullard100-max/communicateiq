@@ -1,6 +1,7 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { C, callAI, getSelectedIndustryId, getSelectedServiceLine, getIndustryConfig, applyOrgConfig, TRAINING_TYPES } from '../../lib/data'
 
 const SILENCE_MS = 5000
@@ -12,7 +13,7 @@ const SILENCE_MS = 5000
 // simulation_attempts.ai_scores stores fine since it's jsonb — the review
 // UI renders whatever dimension keys are present rather than assuming
 // the role-play module's five.
-function persistQbrResult(industryId, deliveryResult, transcript, serviceLine) {
+function persistQbrResult(industryId, deliveryResult, transcript, serviceLine, assignmentId) {
   if (!deliveryResult) return
   const { headline, boardReadiness, strongestMoment, criticalGap, ...scores } = deliveryResult
   fetch('/api/results', {
@@ -23,6 +24,8 @@ function persistQbrResult(industryId, deliveryResult, transcript, serviceLine) {
       scenarioTitle: 'QBR Delivery',
       industry: industryId,
       trainingType: serviceLine || 'qbr',
+      moduleKey: 'qbr',
+      assignmentId: assignmentId || null,
       scores,
       certificationStatus: boardReadiness,
       headline,
@@ -31,7 +34,9 @@ function persistQbrResult(industryId, deliveryResult, transcript, serviceLine) {
   }).catch(() => {}) // fire-and-forget — never blocks the trainee's results screen
 }
 
-export default function QBRPage() {
+function QBRPage() {
+  const searchParams = useSearchParams()
+  const assignmentId = searchParams.get('assignmentId')
   const [industryId, setIndustryId] = useState('higher-ed')
   const [serviceLine, setServiceLine] = useState(null)
   const [orgConfig, setOrgConfig] = useState(null)
@@ -212,7 +217,7 @@ export default function QBRPage() {
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
           setDeliveryResult(parsed)
-          persistQbrResult(industryId, parsed, newMsgs, serviceLine)
+          persistQbrResult(industryId, parsed, newMsgs, serviceLine, assignmentId)
           setStep('results')
         } catch { setMessages(prev => [...prev, { role: 'assistant', content: text }]) }
       } else {
@@ -349,7 +354,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
           setDeliveryResult(parsed)
-          persistQbrResult(industryId, parsed, newMsgs, serviceLine)
+          persistQbrResult(industryId, parsed, newMsgs, serviceLine, assignmentId)
           setStep('results')
         } catch { setMessages(prev => [...prev, { role: 'assistant', content: text }]) }
       } else {
@@ -376,7 +381,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
           const clean = text.slice(text.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
           const parsed = JSON.parse(clean)
           setDeliveryResult(parsed)
-          persistQbrResult(industryId, parsed, apiMsgs, serviceLine)
+          persistQbrResult(industryId, parsed, apiMsgs, serviceLine, assignmentId)
           setStep('results')
         } catch {}
       } else {
@@ -390,7 +395,7 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
             const clean = retry.slice(retry.indexOf(marker) + marker.length).trim().replace(/```json|```/g, '').trim()
             const parsed = JSON.parse(clean)
             setDeliveryResult(parsed)
-            persistQbrResult(industryId, parsed, apiMsgs, serviceLine)
+            persistQbrResult(industryId, parsed, apiMsgs, serviceLine, assignmentId)
             setStep('results')
           } catch {}
         }
@@ -689,4 +694,12 @@ Scoring: 1=Weak, 2=Developing, 3=Proficient, 4=Distinguished`
     )
   }
   return null
+}
+
+export default function QBRPageRoute() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.gray }}>Loading…</div>}>
+      <QBRPage />
+    </Suspense>
+  )
 }
