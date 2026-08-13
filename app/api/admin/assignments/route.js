@@ -51,9 +51,16 @@ export async function POST(req) {
 
   try {
     const body = await req.json()
-    const { name, description, moduleKeys, targetType, targetId, dueAt, passingScore, requiredAttempts } = body
+    const { name, description, targetType, targetId, dueAt, passingScore, requiredAttempts } = body
+    // moduleItems is the current shape ([{ moduleKey, scenarioFamilyIds }]);
+    // moduleKeys is kept accepted for older callers (e.g. the Team
+    // Dashboard's quick "Assign Training" action) that only ever mean "any
+    // scenario in this module".
+    const moduleItems = body.moduleItems?.length
+      ? body.moduleItems
+      : (body.moduleKeys || []).map(moduleKey => ({ moduleKey, scenarioFamilyIds: [] }))
 
-    if (!name || !moduleKeys?.length) {
+    if (!name || !moduleItems.length) {
       return Response.json({ error: 'name and at least one module are required' }, { status: 400 })
     }
     if (!targetType || !targetId) {
@@ -71,7 +78,7 @@ export async function POST(req) {
       userId: session.user.id,
       name,
       description,
-      moduleKeys,
+      moduleItems,
     })
 
     const assignmentId = await createAssignment({

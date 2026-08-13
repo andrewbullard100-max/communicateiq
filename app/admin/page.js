@@ -956,7 +956,11 @@ function AssignmentsPanel({ assignments, cohorts, orgUnits, users, loading, busy
                 <div>
                   <div style={{ fontWeight: 700, color: C.gold, fontSize: 14 }}>{a.trackName}</div>
                   <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                    {a.moduleKeys.map(k => MODULE_LABEL[k] || k).join(' · ')}
+                    {(a.moduleItems || a.moduleKeys.map(moduleKey => ({ moduleKey, scenarioTitles: [] }))).map(m =>
+                      m.scenarioTitles?.length
+                        ? `${MODULE_LABEL[m.moduleKey] || m.moduleKey} (${m.scenarioTitles.join(', ')})`
+                        : MODULE_LABEL[m.moduleKey] || m.moduleKey
+                    ).join(' · ')}
                   </div>
                   <div style={{ fontSize: 12, color: '#374151', marginTop: 4 }}>
                     Target: <strong>{a.target}</strong> · Due: {fmtDueDate(a.dueAt)}
@@ -989,10 +993,19 @@ function AssignmentsPanel({ assignments, cohorts, orgUnits, users, loading, busy
   )
 }
 
+// Mirrors lib/assignments.js's SCENARIO_PICKABLE_MODULE_KEYS — kept as a
+// separate constant here since that file pulls in server-only Supabase code
+// and can't be imported from a client component. QBR has no scenario picker
+// (single fixed build-and-deliver flow), so it's excluded.
+const SCENARIO_PICKABLE_MODULE_KEYS = ['simulation', 'leadership']
+
 function CreateAssignmentModal({ users, orgUnits, cohorts, busy, onCancel, onSubmit, onCreateCohort }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [moduleKeys, setModuleKeys] = useState([])
+  const [scenariosByModule, setScenariosByModule] = useState({}) // moduleKey -> scenario[] from /api/scenarios, fetched lazily
+  const [scenariosLoading, setScenariosLoading] = useState({}) // moduleKey -> bool
+  const [selectedScenarios, setSelectedScenarios] = useState({}) // moduleKey -> Set(scenarioFamilyId)
   const [targetType, setTargetType] = useState('user')
   const [targetId, setTargetId] = useState('')
   const [dueAt, setDueAt] = useState('')
@@ -1002,7 +1015,29 @@ function CreateAssignmentModal({ users, orgUnits, cohorts, busy, onCancel, onSub
   const [newCohortMembers, setNewCohortMembers] = useState([])
 
   function toggleModule(key) {
-    setModuleKeys(m => m.includes(key) ? m.filter(k => k !== key) : [...m, key])
+    setModuleKeys(m => {
+      const next = m.includes(key) ? m.filter(k => k !== key) : [...m, key]
+      // Fetch that module's scenario list the first time it's checked, so
+      // the "require specific scenarios" picker has something to show.
+      if (next.includes(key) && SCENARIO_PICKABLE_MODULE_KEYS.includes(key) && !scenariosByModule[key] && !scenariosLoading[key]) {
+        setScenariosLoading(l => ({ ...l, [key]: true }))
+        fetch(`/api/scenarios?set=${key === 'leadership' ? 'leadership' : 'client'}`)
+          .then(res => res.json())
+          .then(data => setScenariosByModule(s => ({ ...s, [key]: data.scenarios || [] })))
+          .catch(() => setScenariosByModule(s => ({ ...s, [key]: [] })))
+          .finally(() => setScenariosLoading(l => ({ ...l, [key]: false })))
+      }
+      return next
+    })
+  }
+
+  function toggleScenario(moduleKey, familyId) {
+    if (!familyId) return
+    setSelectedScenarios(s => {
+      const current = new Set(s[moduleKey] || [])
+      current.has(familyId) ? current.delete(familyId) : current.add(familyId)
+      return { ...s, [moduleKey]: current }
+    })
   }
 
   async function handleCreateCohortInline() {
@@ -1033,12 +1068,49 @@ function CreateAssignmentModal({ users, orgUnits, cohorts, busy, onCancel, onSub
 
         <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Required modules</label>
         <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
-          {MODULE_OPTIONS.map(m => (
-            <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={moduleKeys.includes(m.key)} onChange={() => toggleModule(m.key)} />
-              {m.label}
-            </label>
-          ))}
+          {MODULE_OPTIONS.map(m => {
+            const checked = moduleKeys.includes(m.key)
+            const pickable = checked && SCENARIO_PICKABLE_MODULE_KEYS.includes(m.key)
+            const scenarios = scenariosByModule[m.key] || []
+            const selected = selectedScenarios[m.key] || new Set()
+            return (
+              <div key={m.key}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleModule(m.key)} />
+                  {m.label}
+                </label>
+                {pickable && (
+                  <div style={{ marginLeft: 24, marginTop: 6, marginBottom: 4, padding: 10, background: '#F8F9FB', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11.5, color: '#6B7280', marginBottom: 6 }}>
+                      Require specific scenarios <span style={{ color: '#9CA3AF' }}>(optional — leave unchecked for any scenario)</span>
+                    </div>
+                    {scenariosLoading[m.key] ? (
+                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading scenarios…</div>
+                    ) : !scenarios.length ? (
+                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>No scenarios available for this module yet.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
+                        {scenarios.map(s => (
+                          <label key={s.scenarioFamilyId || s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: s.scenarioFamilyId ? 'pointer' : 'default', opacity: s.scenarioFamilyId ? 1 : 0.5 }}>
+                            <input
+                              type="checkbox"
+                              disabled={!s.scenarioFamilyId}
+                              checked={selected.has(s.scenarioFamilyId)}
+                              onChange={() => toggleScenario(m.key, s.scenarioFamilyId)}
+                            />
+                            <span style={{ color: '#374151' }}>{s.title}</span>
+                            <span style={{ color: '#9CA3AF', fontSize: 11 }}>
+                              — {INDUSTRIES.find(i => i.id === s.industry)?.label || s.industry}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Assign to</label>
@@ -1116,7 +1188,10 @@ function CreateAssignmentModal({ users, orgUnits, cohorts, busy, onCancel, onSub
             onClick={() => onSubmit({
               name: name.trim(),
               description: description.trim() || null,
-              moduleKeys,
+              moduleItems: moduleKeys.map(moduleKey => ({
+                moduleKey,
+                scenarioFamilyIds: [...(selectedScenarios[moduleKey] || [])],
+              })),
               targetType,
               targetId,
               dueAt: dueAt ? new Date(dueAt).toISOString() : null,

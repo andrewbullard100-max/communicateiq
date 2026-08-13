@@ -139,19 +139,39 @@ Keep under 400 words. Be direct and specific.`
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                        {a.modules.map(m => (
-                          m.complete ? (
-                            <span key={m.key} style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: `${C.green}22`, color: C.green, fontWeight: 600 }}>
-                              ✓ {m.label}
-                            </span>
-                          ) : (
-                            <Link key={m.key} href={`${MODULE_ROUTES[m.key] || '/'}?assignmentId=${a.id}`} style={{ textDecoration: 'none' }}>
-                              <span style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: 'rgba(28,43,94,0.08)', color: C.gold, fontWeight: 600, cursor: 'pointer' }}>
-                                Start {m.label} →
-                              </span>
-                            </Link>
-                          )
-                        ))}
+                        {a.modules.flatMap(m =>
+                          // requiredScenarios means this module was narrowed to specific
+                          // scenarios (see lib/assignments.js's getMyAssignments) — show
+                          // each one by name so the trainee knows exactly what's needed,
+                          // instead of one generic pill for "any scenario in this module".
+                          m.requiredScenarios
+                            ? m.requiredScenarios.map((rs, i) => (
+                                rs.complete ? (
+                                  <span key={`${m.key}-${i}`} style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: `${C.green}22`, color: C.green, fontWeight: 600 }}>
+                                    ✓ {rs.title}
+                                  </span>
+                                ) : (
+                                  <Link key={`${m.key}-${i}`} href={`${MODULE_ROUTES[m.key] || '/'}?assignmentId=${a.id}`} style={{ textDecoration: 'none' }}>
+                                    <span style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: 'rgba(28,43,94,0.08)', color: C.gold, fontWeight: 600, cursor: 'pointer' }}>
+                                      Start "{rs.title}" →
+                                    </span>
+                                  </Link>
+                                )
+                              ))
+                            : [
+                                m.complete ? (
+                                  <span key={m.key} style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: `${C.green}22`, color: C.green, fontWeight: 600 }}>
+                                    ✓ {m.label}
+                                  </span>
+                                ) : (
+                                  <Link key={m.key} href={`${MODULE_ROUTES[m.key] || '/'}?assignmentId=${a.id}`} style={{ textDecoration: 'none' }}>
+                                    <span style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 20, background: 'rgba(28,43,94,0.08)', color: C.gold, fontWeight: 600, cursor: 'pointer' }}>
+                                      Start {m.label} →
+                                    </span>
+                                  </Link>
+                                ),
+                              ]
+                        )}
                       </div>
                     </div>
                   ))}

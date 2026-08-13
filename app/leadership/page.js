@@ -74,6 +74,7 @@ function persistResult(scenario, scored, assignmentId, pressureLevel) {
     body: JSON.stringify({
       scenarioId: scenario.id,
       scenarioTitle: scenario.title,
+      scenarioVersionId: scenario.scenarioVersionId || null,
       industry: scenario.industry,
       trainingType: scenario.trainingType,
       moduleKey: 'leadership',

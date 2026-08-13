@@ -18,7 +18,7 @@ const LEADERSHIP_TRAINING_TYPES = [
   'facilities-maintenance-leadership', 'facilities-housekeeping-leadership',
 ]
 
-function mapRow(row, set, id) {
+function mapRow(row, set, id, familyId) {
   const meta = SCENARIO_META[id] || { icon: '🎭', focus: '' }
   const base = {
     id,
@@ -33,6 +33,12 @@ function mapRow(row, set, id) {
     dataPacket: row.data_packet,
     openingLine: row.opening_line,
     successCriteria: row.success_criteria,
+    // Real DB identity, distinct from `id` above (a display slug / synthetic
+    // id) — needed to record which scenario an attempt was actually against
+    // (simulation_attempts.scenario_version_id) and, for assignments, which
+    // scenario_family a specific-scenario requirement points at.
+    scenarioVersionId: row.id || null,
+    scenarioFamilyId: familyId || null,
   }
   return set === 'leadership'
     ? { ...base, counterpartPersona: row.client_persona }
@@ -61,7 +67,7 @@ async function fetchOrgScenarios(orgId, set) {
       const v = row.scenario_versions[0]
       // 'org-{shortId}' rather than the shared library's slug-derived id —
       // these are per-org rows, not part of the shared SCENARIO_META map.
-      return mapRow({ ...v, industry_id: row.industry_id, training_type: row.training_type }, set, `org-${row.id.slice(0, 8)}`)
+      return mapRow({ ...v, industry_id: row.industry_id, training_type: row.training_type }, set, `org-${row.id.slice(0, 8)}`, row.id)
     })
 }
 
@@ -73,7 +79,7 @@ export async function GET(request) {
   try {
     const [rows, session] = await Promise.all([
       supabaseSelect('scenario_families', {
-        select: 'slug,industry_id,training_type,scenario_versions!inner(title,day_label,difficulty,context,opening_line,client_persona,data_packet,success_criteria,status)',
+        select: 'id,slug,industry_id,training_type,scenario_versions!inner(id,title,day_label,difficulty,context,opening_line,client_persona,data_packet,success_criteria,status)',
         'org_id': 'is.null',
         'training_type': `in.(${trainingTypes.join(',')})`,
         'scenario_versions.status': 'eq.approved',
@@ -81,7 +87,7 @@ export async function GET(request) {
       getServerSession(authOptions),
     ])
 
-    const sharedScenarios = rows.map(row => mapRow(row.scenario_versions[0], set, row.slug.toUpperCase()))
+    const sharedScenarios = rows.map(row => mapRow(row.scenario_versions[0], set, row.slug.toUpperCase(), row.id))
     const orgScenarios = await fetchOrgScenarios(session?.user?.orgId, set)
 
     return NextResponse.json({ scenarios: [...sharedScenarios, ...orgScenarios], source: 'supabase' })

@@ -14,6 +14,7 @@ export async function POST(req) {
       orgId: session.user.orgId,
       assignmentId: body.assignmentId || null,
       scenarioLabel: body.scenarioTitle || body.scenarioId || null,
+      scenarioVersionId: body.scenarioVersionId || null,
       industry: body.industry || null,
       trainingType: body.trainingType || null,
       moduleKey: body.moduleKey || null,
