@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth'
-import { authOptions, ADMIN_CONSOLE_ROLES } from '../../../../lib/auth'
+import { authOptions, ADMIN_CONSOLE_ROLES, TEAM_VIEW_ROLES } from '../../../../lib/auth'
 import { listOrgAssignments, createAssignment, createTrainingTrack } from '../../../../lib/assignments'
 
 async function requireAdmin() {
@@ -7,6 +7,24 @@ async function requireAdmin() {
   if (!session?.user) return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) }
   if (!ADMIN_CONSOLE_ROLES.includes(session.user.role)) {
     return { error: Response.json({ error: 'Forbidden — org_admin role or higher required' }, { status: 403 }) }
+  }
+  if (!session.user.orgId) {
+    return { error: Response.json({ error: 'No organization on this session' }, { status: 400 }) }
+  }
+  return { session }
+}
+
+// Broader than requireAdmin — managers can also create assignments (see the
+// Team Dashboard's "Assign Training" action), but only ever targeting a
+// single person, never an org_unit or cohort. createAssignment() enforces
+// the actual boundary (the target person must be visible to the caller
+// under the same RLS that scopes the Team Dashboard roster itself — see
+// lib/assignments.js), this is just the coarse role gate.
+async function requireAssigner() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) }
+  if (!TEAM_VIEW_ROLES.includes(session.user.role)) {
+    return { error: Response.json({ error: 'Forbidden — manager role or higher required' }, { status: 403 }) }
   }
   if (!session.user.orgId) {
     return { error: Response.json({ error: 'No organization on this session' }, { status: 400 }) }
@@ -28,7 +46,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const { session, error } = await requireAdmin()
+  const { session, error } = await requireAssigner()
   if (error) return error
 
   try {
@@ -40,6 +58,12 @@ export async function POST(req) {
     }
     if (!targetType || !targetId) {
       return Response.json({ error: 'A target (user, org unit, or cohort) is required' }, { status: 400 })
+    }
+    // Managers (not org_admin/corporate_admin) can only ever target a single
+    // person, and only one visible to them — see createAssignment's
+    // visibility check for the actual enforcement.
+    if (!ADMIN_CONSOLE_ROLES.includes(session.user.role) && targetType !== 'user') {
+      return Response.json({ error: 'Managers can only assign training to an individual person, not an org unit or cohort.' }, { status: 403 })
     }
 
     const track = await createTrainingTrack({
@@ -67,3 +91,4 @@ export async function POST(req) {
     return Response.json({ error: err.message }, { status: 400 })
   }
 }
+

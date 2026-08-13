@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import { C, DIMENSIONS, LEVEL_LABELS, INDUSTRIES } from '../../lib/data'
 import { computeCompetencyTrend, dimensionLabel, summarizeForCoaching } from '../../lib/analytics'
 
+const MODULE_LABEL = { simulation: 'Client Role-Play Simulation', leadership: 'Leadership Simulation', qbr: 'QBR Delivery' }
+
 function avg(nums) {
   if (!nums.length) return 0
   return nums.reduce((a, b) => a + b, 0) / nums.length
@@ -36,6 +38,9 @@ export default function TeamDashboard() {
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
   const [industryFilter, setIndustryFilter] = useState('all')
+  const [assignTarget, setAssignTarget] = useState(null) // the user card being assigned training, or null
+  const [assignBusy, setAssignBusy] = useState(false)
+  const [assignToast, setAssignToast] = useState(null)
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -50,6 +55,40 @@ export default function TeamDashboard() {
       .catch(() => setLoading(false))
   }, [status])
 
+  async function handleAssignTraining(user, dueInDays) {
+    if (!user.coaching) return
+    setAssignBusy(true)
+    try {
+      const dueAt = new Date(Date.now() + dueInDays * 24 * 60 * 60 * 1000).toISOString()
+      const res = await fetch('/api/admin/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${user.coaching.developmentOpportunity} Coaching — ${user.name}`,
+          description: user.coaching.coachingTip,
+          moduleKeys: [user.coaching.recommendedModuleKey],
+          targetType: 'user',
+          targetId: user.userId,
+          dueAt,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to assign training')
+      setAssignToast({ type: 'success', text: `Assigned to ${user.name}.` })
+      setAssignTarget(null)
+    } catch (err) {
+      setAssignToast({ type: 'error', text: err.message })
+    } finally {
+      setAssignBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!assignToast) return
+    const t = setTimeout(() => setAssignToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [assignToast])
+
   const filtered = useMemo(
     () => industryFilter === 'all' ? results : results.filter(r => r.industry === industryFilter),
     [results, industryFilter]
@@ -59,7 +98,7 @@ export default function TeamDashboard() {
     const map = {}
     filtered.forEach(r => {
       const key = r.userEmail || 'unknown'
-      if (!map[key]) map[key] = { email: r.userEmail, name: r.userName || r.userEmail, results: [], industries: new Set() }
+      if (!map[key]) map[key] = { email: r.userEmail, name: r.userName || r.userEmail, userId: r.userId, results: [], industries: new Set() }
       map[key].results.push(r)
       if (r.industry) map[key].industries.add(r.industry)
     })
@@ -229,12 +268,81 @@ export default function TeamDashboard() {
 
               {u.coaching && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #EAECF0', fontSize: 12, color: '#6B7280' }}>
-                  Strength: <strong style={{ color: '#374151' }}>{u.coaching.strength}</strong> ({u.coaching.strengthScore.toFixed(1)}) · Development opportunity: <strong style={{ color: '#374151' }}>{u.coaching.developmentOpportunity}</strong> ({u.coaching.developmentScore.toFixed(1)})
-                  {u.results[0] && <> · Most recent: <strong style={{ color: '#374151' }}>{u.results[0].scenarioTitle}</strong> — {u.results[0].certificationStatus}</>}
+                  <div>
+                    Strength: <strong style={{ color: '#374151' }}>{u.coaching.strength}</strong> ({u.coaching.strengthScore.toFixed(1)}) · Development opportunity: <strong style={{ color: '#374151' }}>{u.coaching.developmentOpportunity}</strong> ({u.coaching.developmentScore.toFixed(1)})
+                    {u.results[0] && <> · Most recent: <strong style={{ color: '#374151' }}>{u.results[0].scenarioTitle}</strong> — {u.results[0].certificationStatus}</>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 200, fontSize: 11.5, color: '#6B7280', fontStyle: 'italic' }}>
+                      Suggested coaching: {u.coaching.coachingTip}
+                    </div>
+                    {u.userId && (
+                      <button onClick={() => setAssignTarget(u)}
+                        style={{ fontSize: 11.5, whiteSpace: 'nowrap', padding: '5px 12px', borderRadius: 6, border: `1px solid ${C.gold}`, background: '#fff', color: C.gold, fontWeight: 600, cursor: 'pointer' }}>
+                        Assign {MODULE_LABEL[u.coaching.recommendedModuleKey] || u.coaching.recommendedModuleKey} →
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      {assignTarget && (
+        <AssignTrainingModal
+          user={assignTarget}
+          busy={assignBusy}
+          onCancel={() => setAssignTarget(null)}
+          onConfirm={dueInDays => handleAssignTraining(assignTarget, dueInDays)}
+        />
+      )}
+      {assignToast && (
+        <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: assignToast.type === 'error' ? '#C00000' : C.green, color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 60 }}>
+          {assignToast.text}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AssignTrainingModal({ user, busy, onCancel, onConfirm }) {
+  const [dueInDays, setDueInDays] = useState(14)
+  const { coaching } = user
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 420 }}>
+        <div style={{ fontWeight: 700, color: C.gold, marginBottom: 4, fontSize: 15 }}>Assign Training</div>
+        <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 16 }}>For {user.name} ({user.email})</div>
+
+        <div style={{ background: '#F4F6F9', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Development opportunity</div>
+          <div style={{ fontWeight: 700, color: '#374151', fontSize: 14, marginBottom: 8 }}>{coaching.developmentOpportunity} ({coaching.developmentScore.toFixed(1)}/4)</div>
+          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Suggested coaching</div>
+          <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, marginBottom: 10 }}>{coaching.coachingTip}</div>
+          <div style={{ fontSize: 12, color: '#6B7280' }}>
+            Recommended module: <strong style={{ color: '#374151' }}>{MODULE_LABEL[coaching.recommendedModuleKey] || coaching.recommendedModuleKey}</strong>
+          </div>
+        </div>
+
+        <label style={{ display: 'block', fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Due in</label>
+        <select value={dueInDays} onChange={e => setDueInDays(Number(e.target.value))}
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #D1D5DB', marginBottom: 20, fontSize: 13 }}>
+          <option value={7}>1 week</option>
+          <option value={14}>2 weeks</option>
+          <option value={30}>30 days</option>
+        </select>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #D1D5DB', background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          <button
+            disabled={busy}
+            onClick={() => onConfirm(dueInDays)}
+            style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: C.communicateiqRed, color: '#fff', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Assigning…' : 'Assign Training'}
+          </button>
         </div>
       </div>
     </div>
