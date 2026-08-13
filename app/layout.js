@@ -2,7 +2,7 @@ import './globals.css'
 import Providers from './providers'
 
 export const metadata = {
-  title: 'CommunicateIQ — Food Service Leadership Training Platform',
+  title: 'CommunicateIQ — Leadership Training Platform',
   description: 'AI-powered executive communication training for contract dining & hospitality leadership',
 }
 

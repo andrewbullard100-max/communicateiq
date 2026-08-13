@@ -11,6 +11,12 @@ import { CORE_FLOW, SECONDARY_MODULES, INDUSTRIES, TRAINING_TYPES } from '../lib
 // / REVIEWER_ROLES / CONTENT_ROLES, mirrored in app/admin/page.js).
 const ELEVATED_ROLES = ['manager', 'content_author', 'content_approver', 'org_admin', 'corporate_admin']
 
+// Same role set as the Admin Console's Content Upload tab (CONTENT_ROLES in
+// app/admin/page.js) — kept as its own visible top-nav link rather than
+// buried inside the console, since building scenarios is a distinct,
+// frequent action for these roles, not an admin task.
+const CONTENT_ROLES = ['content_author', 'content_approver', 'org_admin', 'corporate_admin']
+
 export default function Home() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -19,6 +25,7 @@ export default function Home() {
   const [trainingType, setTrainingType] = useState(null)
   const [progress, setProgress] = useState({ diagnostic: false, stakeholder: false, simulation: false, financial: false, qbr: false })
   const hasConsoleAccess = ELEVATED_ROLES.includes(session?.user?.role)
+  const hasContentAccess = CONTENT_ROLES.includes(session?.user?.role)
 
   // Check sessionStorage so navigating back doesn't re-show splash
   useEffect(() => {
@@ -143,6 +150,11 @@ export default function Home() {
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#0D9488' }} />
             <span style={{ color: '#99F1E8', fontSize: 11, fontWeight: 600, fontFamily: 'Source Sans 3, sans-serif', letterSpacing: 1 }}>AI COACHING ENABLED</span>
           </div>
+          {hasContentAccess && (
+            <Link href="/admin?tab=policies" style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 700, textDecoration: 'none', letterSpacing: 0.5, background: '#0D9488', borderRadius: 6, padding: '6px 12px' }}>
+              Create Scenarios →
+            </Link>
+          )}
           {hasConsoleAccess && (
             <Link href="/admin" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 700, textDecoration: 'none', letterSpacing: 0.5, border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '6px 12px' }}>
               Console →
@@ -171,14 +183,6 @@ export default function Home() {
           <p style={{ color: '#374151', fontSize: 16, lineHeight: 1.8, maxWidth: 620, marginBottom: 32 }}>
             On-demand leadership communication training — ready when you are. Practice the exact conversations that define your career: executive escalations, client financial reviews, service recovery, and stakeholder management. No scheduled bootcamp required. Train when the moment calls for it, scored in real time against a five-dimension certification rubric.
           </p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {[['5','Rubric Dimensions'],['4','Live Simulations'],['Self-Paced','Certification Track'],['80%+','Required to Certify'],['AI-Scored','Field Assessment']].map(([val, lbl]) => (
-              <div key={lbl} style={{ textAlign: 'center', padding: '14px 20px', background: '#FFFFFF', border: '1.5px solid #D1D5DB', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', minWidth: 110 }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#1C2B5E', fontFamily: 'monospace', marginBottom: 3 }}>{val}</div>
-                <div style={{ fontSize: 11, color: '#6B7280' }}>{lbl}</div>
-              </div>
-            ))}
-          </div>
         </div>
 
         <div style={{ height: 1, background: '#D1D5DB', marginBottom: 28 }} />
