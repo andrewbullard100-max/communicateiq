@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
+import Link from 'next/link'
 import { signIn, getProviders } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -117,6 +118,9 @@ function LoginForm() {
             onChange={e => setPassword(e.target.value)}
             style={{ width: '100%', marginTop: 4, padding: '10px 12px', borderRadius: 8, border: '1.5px solid #D1D5DB', fontSize: 14 }}
           />
+          <Link href="/forgot-password" style={{ display: 'block', marginTop: 6, fontSize: 12, color: '#6B7280', textAlign: 'right' }}>
+            Forgot password?
+          </Link>
         </div>
 
         {error && (

@@ -91,6 +91,7 @@ Keep under 400 words. Be direct and specific.`
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
           <Link href="/" className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>← Platform Home</Link>
           <span style={{ color: '#6B7280', fontSize: 12 }}>Certification Dashboard</span>
+          <Link href="/account" style={{ marginLeft: 'auto', fontSize: 12, color: '#6B7280' }}>My Account</Link>
         </div>
 
         <span className="label">Certification Progress</span>
