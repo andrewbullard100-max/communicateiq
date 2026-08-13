@@ -12,11 +12,13 @@ export async function DELETE(req, { params }) {
   }
   if (!session.user.orgId) return Response.json({ error: 'No organization on this session' }, { status: 400 })
 
+  const cascade = new URL(req.url).searchParams.get('cascade') === 'true'
+
   try {
-    await deletePolicyDocument(session.user.orgId, params.id)
+    await deletePolicyDocument(session.user.orgId, params.id, { cascade })
     return Response.json({ ok: true })
   } catch (err) {
     console.error('Delete policy document error:', err)
-    return Response.json({ error: err.message }, { status: 400 })
+    return Response.json({ error: err.message, linkedCount: err.linkedCount }, { status: 400 })
   }
 }

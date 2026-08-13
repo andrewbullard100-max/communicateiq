@@ -351,8 +351,25 @@ function AdminConsole() {
     try {
       const res = await fetch(`/api/admin/policies/${docId}`, { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Delete failed')
-      loadPolicyDocs()
+      if (res.ok) { loadPolicyDocs(); return }
+
+      // The document has generated scenarios/config linked to it (draft,
+      // approved, or archived) — offer to remove that content too rather
+      // than dead-ending with a raw error.
+      if (data.linkedCount) {
+        const also = confirm(
+          `${data.error}\n\n${data.linkedCount} linked item${data.linkedCount === 1 ? '' : 's'} found. Delete the document AND everything generated from it? This can't be undone.`
+        )
+        if (!also) return
+        const res2 = await fetch(`/api/admin/policies/${docId}?cascade=true`, { method: 'DELETE' })
+        const data2 = await res2.json()
+        if (!res2.ok) throw new Error(data2.error || 'Delete failed')
+        setToast({ type: 'success', text: 'Document and linked content deleted.' })
+        loadPolicyDocs()
+        return
+      }
+
+      throw new Error(data.error || 'Delete failed')
     } catch (err) {
       setToast({ type: 'error', text: err.message })
     }
