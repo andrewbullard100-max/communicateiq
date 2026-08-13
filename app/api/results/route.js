@@ -17,6 +17,7 @@ export async function POST(req) {
       industry: body.industry || null,
       trainingType: body.trainingType || null,
       moduleKey: body.moduleKey || null,
+      pressureLevel: body.pressureLevel || null,
       scores: body.scores || null, // { clarity, data, ownership, tone, commitment } each 1-4 (dimension keys vary by module)
       certificationStatus: body.certificationStatus || null,
       headline: body.headline || null,

@@ -3,6 +3,8 @@ import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { C, LEADERSHIP_SCENARIOS, DIMENSIONS, LEVEL_LABELS, LEVEL_COLORS, INDUSTRIES, callAI } from '../../lib/data'
+import { computeCompetencyTrend } from '../../lib/analytics'
+import { PRESSURE_LEVELS, recommendPressureLevel, buildAdaptiveDirective } from '../../lib/pressure'
 
 const SILENCE_MS = 3500
 
@@ -15,7 +17,8 @@ const TOPIC_LABELS = {
   'facilities-housekeeping-leadership': 'Facilities — Housekeeping',
 }
 
-function buildSystemPrompt(scenario) {
+function buildSystemPrompt(scenario, pressureLevel, adaptiveDirective) {
+  const pressure = PRESSURE_LEVELS.find(p => p.level === pressureLevel)
   return `You are an AI-powered leadership training evaluator for CommunicateIQ Leadership & Operations Training.
 
 You play TWO roles simultaneously:
@@ -47,7 +50,9 @@ LEADERSHIP CONTEXT: Unlike client-facing scenarios, the trainee here holds real 
 SCENARIO: ${scenario.context}
 SUCCESS CRITERIA:
 ${scenario.successCriteria.map((c, i) => `${i+1}. ${c}`).join('\n')}
-${scenario.dataPacket ? `\nDATA PACKET:\n${scenario.dataPacket.headers.join(' | ')}\n${scenario.dataPacket.rows.map(r => r.join(' | ')).join('\n')}` : ''}`
+${scenario.dataPacket ? `\nDATA PACKET:\n${scenario.dataPacket.headers.join(' | ')}\n${scenario.dataPacket.rows.map(r => r.join(' | ')).join('\n')}` : ''}
+${pressure ? `\n${pressure.directive}` : ''}
+${adaptiveDirective ? `\n${adaptiveDirective}` : ''}`
 }
 
 function parseScoringResult(text) {
@@ -60,7 +65,7 @@ function parseScoringResult(text) {
   } catch { return null }
 }
 
-function persistResult(scenario, scored, assignmentId) {
+function persistResult(scenario, scored, assignmentId, pressureLevel) {
   if (!scenario || !scored?.scores) return
   fetch('/api/results', {
     method: 'POST',
@@ -72,6 +77,7 @@ function persistResult(scenario, scored, assignmentId) {
       trainingType: scenario.trainingType,
       moduleKey: 'leadership',
       assignmentId: assignmentId || null,
+      pressureLevel: pressureLevel || null,
       scores: scored.scores,
       certificationStatus: scored.certificationStatus,
       headline: scored.headline,
@@ -97,6 +103,9 @@ function LeadershipPage() {
   const assignmentId = searchParams.get('assignmentId')
   const [screen, setScreen] = useState('select')
   const [selected, setSelected] = useState(null)
+  const [pressureLevel, setPressureLevel] = useState(1)
+  const [recommendedLevel, setRecommendedLevel] = useState(null)
+  const [adaptiveDirective, setAdaptiveDirective] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -142,6 +151,8 @@ function LeadershipPage() {
   const chunksRef = useRef([])
   const messagesRef = useRef([])
   const selectedRef = useRef(null)
+  const pressureLevelRef = useRef(1)
+  const adaptiveDirectiveRef = useRef(null)
   const isLoading = useRef(false)
   const silenceTimerRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -150,6 +161,25 @@ function LeadershipPage() {
 
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { selectedRef.current = selected }, [selected])
+  useEffect(() => { pressureLevelRef.current = pressureLevel }, [pressureLevel])
+  useEffect(() => { adaptiveDirectiveRef.current = adaptiveDirective }, [adaptiveDirective])
+
+  // Adaptive difficulty: same as Simulation — pull attempt history to
+  // recommend a starting pressure level and silently target a demonstrated
+  // weak dimension this rep (see lib/pressure.js).
+  useEffect(() => {
+    fetch('/api/results?scope=self')
+      .then(res => res.json())
+      .then(data => {
+        const results = data.results || []
+        const trend = computeCompetencyTrend(results)
+        const rec = recommendPressureLevel(trend, results.length)
+        setRecommendedLevel(rec)
+        setPressureLevel(rec.level)
+        setAdaptiveDirective(buildAdaptiveDirective(trend))
+      })
+      .catch(() => {})
+  }, [])
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
   useEffect(() => {
@@ -303,13 +333,13 @@ function LeadershipPage() {
 
     try {
       const aiText = await callAI({
-        system: buildSystemPrompt(selectedRef.current),
+        system: buildSystemPrompt(selectedRef.current, pressureLevelRef.current, adaptiveDirectiveRef.current),
         messages: newMsgs,
       })
       const scored = parseScoringResult(aiText)
       if (scored) {
         setResult(scored)
-        persistResult(selectedRef.current, scored, assignmentId)
+        persistResult(selectedRef.current, scored, assignmentId, pressureLevelRef.current)
         setScreen('results')
       } else {
         const updatedMsgs = [...newMsgs, { role: 'assistant', content: aiText }]
@@ -340,7 +370,7 @@ function LeadershipPage() {
     setLoading(true)
     try {
       const text = await callAI({
-        system: buildSystemPrompt(selected),
+        system: buildSystemPrompt(selected, pressureLevel, adaptiveDirective),
         messages: [{ role: 'user', content: '[BEGIN SIMULATION — deliver your opening line now, in character, no preamble]' }],
       })
       isLoading.current = false
@@ -374,23 +404,23 @@ function LeadershipPage() {
         content: '[END SIMULATION] Output SIMULATION_COMPLETE followed immediately by the JSON scoring block. Do not speak as the character. Do not add any text before or after the JSON.'
       }]
       const text = await callAI({
-        system: buildSystemPrompt(selectedRef.current),
+        system: buildSystemPrompt(selectedRef.current, pressureLevelRef.current, adaptiveDirectiveRef.current),
         messages: apiMsgs,
         max_tokens: 800
       })
       const scored = parseScoringResult(text)
       if (scored) {
         setResult(scored)
-        persistResult(selectedRef.current, scored, assignmentId)
+        persistResult(selectedRef.current, scored, assignmentId, pressureLevelRef.current)
         setScreen('results')
       } else {
         const retry = await callAI({
-          system: buildSystemPrompt(selectedRef.current) + '\n\nCRITICAL: You MUST output SIMULATION_COMPLETE followed by valid JSON now. Nothing else.',
+          system: buildSystemPrompt(selectedRef.current, pressureLevelRef.current, adaptiveDirectiveRef.current) + '\n\nCRITICAL: You MUST output SIMULATION_COMPLETE followed by valid JSON now. Nothing else.',
           messages: [...apiMsgs, { role: 'assistant', content: text }, { role: 'user', content: 'Output the SIMULATION_COMPLETE JSON scoring block now.' }],
           max_tokens: 800
         })
         const scoredRetry = parseScoringResult(retry)
-        if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry, assignmentId); setScreen('results') }
+        if (scoredRetry) { setResult(scoredRetry); persistResult(selectedRef.current, scoredRetry, assignmentId, pressureLevelRef.current); setScreen('results') }
       }
     } catch {}
     isLoading.current = false
@@ -501,10 +531,34 @@ function LeadershipPage() {
           <span className="label">Success Criteria</span>
           {selected.successCriteria.map((c, i) => <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13, color: '#374151' }}><span style={{ color: '#1C2B5E' }}>+</span>{c}</div>)}
         </div>
-        <div className="card fade-up-4" style={{ marginBottom: 24, borderColor: '#1C2B5E', background: 'rgba(28,43,94,0.04)' }}>
+        <div className="card fade-up-4" style={{ marginBottom: 14, borderColor: '#1C2B5E', background: 'rgba(28,43,94,0.04)' }}>
           <span className="label">Opening Line — Delivered by AI Counterpart</span>
           <p style={{ fontSize: 15, fontStyle: 'italic', color: '#1C2B5E', lineHeight: 1.6 }}>"{selected.openingLine}"</p>
         </div>
+
+        <div className="card fade-up-4" style={{ marginBottom: 24 }}>
+          <span className="label">Pressure Level</span>
+          {recommendedLevel && (
+            <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>{recommendedLevel.rationale}</p>
+          )}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+            {PRESSURE_LEVELS.map(p => (
+              <button key={p.level} onClick={() => setPressureLevel(p.level)}
+                style={{
+                  padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  border: `1.5px solid ${pressureLevel === p.level ? C.gold : '#D1D5DB'}`,
+                  background: pressureLevel === p.level ? C.gold : '#fff',
+                  color: pressureLevel === p.level ? '#fff' : '#374151',
+                }}>
+                {p.shortLabel}{recommendedLevel?.level === p.level ? ' ★' : ''}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>
+            {PRESSURE_LEVELS.find(p => p.level === pressureLevel)?.description}
+          </p>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn-primary" onClick={beginSim}>Begin Simulation →</button>
         </div>
